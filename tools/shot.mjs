@@ -59,6 +59,39 @@ await page.keyboard.press('Alt'); // indietro
 await page.keyboard.press('Alt'); // chiude il menu
 await new Promise(r=>setTimeout(r, 300));
 
+// città (Varese) per vedere gli edifici
+await page.evaluate(async ()=>{
+  const { MAPS } = await import('./js/data/maps.js');
+  const { loadMap } = await import('./js/screens/world.js');
+  const m = MAPS.varese.tiles;
+  outer: for (let y=2; y<m.length; y++) for (let x=2; x<m[y].length; x++){
+    if (m[y][x] === ':'){ loadMap('varese', x, y); break outer; }
+  }
+});
+await new Promise(r=>setTimeout(r, 400));
+for (let i = 0; i < 15; i++){
+  const open = await page.$('#dialog-box:not(.hidden)');
+  if (!open) break;
+  await page.keyboard.press('Enter');
+  await new Promise(r=>setTimeout(r, 100));
+}
+await page.screenshot({ path: 'tools/shot-town.png' });
+
+// mappa del mondo + tab mappa
+await page.evaluate(async ()=>{
+  const { loadMap } = await import('./js/screens/world.js');
+  loadMap('world', 28, 20);
+});
+await new Promise(r=>setTimeout(r, 400));
+await page.screenshot({ path: 'tools/shot-overworld.png' });
+await page.keyboard.press('Space');
+await new Promise(r=>setTimeout(r, 300));
+await page.evaluate(()=>document.querySelector('#menu-tabs .tab[data-tab="map"]')?.click());
+await new Promise(r=>setTimeout(r, 300));
+await page.screenshot({ path: 'tools/shot-map.png' });
+await page.keyboard.press('Alt');
+await new Promise(r=>setTimeout(r, 300));
+
 // battaglia
 await page.evaluate(async ()=>{
   const { show } = await import('./js/engine/ui.js');

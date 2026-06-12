@@ -177,6 +177,76 @@ function renderItemUse(itemId){
   contentEl.appendChild(back);
 }
 
+// ---------- MAPPA ----------
+const MAP_COLORS = {
+  '.':'#4a8c3f', ',':'#3a7330', 'F':'#5a9c48',
+  '=':'#c2a36f', ':':'#9aa0ae',
+  '~':'#2e6fb2', 'B':'#8a5a2b',
+  '^':'#6e6557', 'T':'#2c6a24',
+  '#':'#8a6d54', 'D':'#b07c3e',
+  '1':'#d9534f', '2':'#d9534f', '3':'#d9534f', '4':'#d9534f', '5':'#d9534f',
+  'S':'#ffd76a', 'A':'#5b78d6',
+};
+
+function renderMapTab(){
+  contentEl.innerHTML = '';
+  const map = MAPS[G.s.map];
+  const rows = map.tiles;
+  const w = Math.max(...rows.map(r=>r.length)), h = rows.length;
+  const s = Math.max(3, Math.min(Math.floor(600/w), Math.floor(330/h), 12));
+
+  const head = document.createElement('p');
+  head.style.cssText = 'padding:4px 6px;font-weight:700;color:#ffd76a';
+  head.textContent = `🗺 ${map.name}`;
+  contentEl.appendChild(head);
+
+  const cv = document.createElement('canvas');
+  cv.width = w*s; cv.height = h*s;
+  cv.style.cssText = 'display:block;margin:4px auto;border-radius:14px;max-width:100%;box-shadow:0 8px 24px rgba(0,0,0,.45)';
+  const x = cv.getContext('2d');
+  x.fillStyle = '#0a0c16';
+  x.fillRect(0, 0, cv.width, cv.height);
+  for (let ty=0; ty<h; ty++){
+    for (let tx=0; tx<rows[ty].length; tx++){
+      const c = MAP_COLORS[rows[ty][tx]];
+      if (!c) continue;
+      x.fillStyle = c;
+      x.fillRect(tx*s, ty*s, s, s);
+    }
+  }
+  // portali evidenziati (con nome sulla mappa del mondo)
+  x.textAlign = 'center';
+  x.font = `bold ${Math.max(9, s*2.2)}px system-ui, sans-serif`;
+  for (const tr of (map.triggers||[]).filter(t=>t.type === 'portal')){
+    x.fillStyle = '#fff';
+    x.beginPath(); x.arc(tr.x*s+s/2, tr.y*s+s/2, s*0.8, 0, Math.PI*2); x.fill();
+    x.fillStyle = '#d9534f';
+    x.beginPath(); x.arc(tr.x*s+s/2, tr.y*s+s/2, s*0.5, 0, Math.PI*2); x.fill();
+    if (G.s.map === 'world' && MAPS[tr.to?.map]?.name){
+      const label = MAPS[tr.to.map].name;
+      x.fillStyle = 'rgba(8,8,22,.75)';
+      const tw = x.measureText(label).width;
+      x.fillRect(tr.x*s+s/2-tw/2-4, (tr.y-2.6)*s, tw+8, s*2.4);
+      x.fillStyle = '#ffe9a8';
+      x.fillText(label, tr.x*s+s/2, (tr.y-0.9)*s);
+    }
+  }
+  // posizione del giocatore
+  x.save();
+  x.shadowColor = '#ffd76a'; x.shadowBlur = 10;
+  x.fillStyle = '#fff';
+  x.beginPath(); x.arc(G.s.x*s+s/2, G.s.y*s+s/2, Math.max(4, s*0.9), 0, Math.PI*2); x.fill();
+  x.fillStyle = '#ffd76a';
+  x.beginPath(); x.arc(G.s.x*s+s/2, G.s.y*s+s/2, Math.max(2.6, s*0.6), 0, Math.PI*2); x.fill();
+  x.restore();
+  contentEl.appendChild(cv);
+
+  const legend = document.createElement('p');
+  legend.style.cssText = 'text-align:center;font-size:11px;color:#9aa3c7;padding:4px';
+  legend.innerHTML = '<span style="color:#ffd76a">●</span> Tu sei qui &nbsp;·&nbsp; <span style="color:#d9534f">●</span> Passaggi e ingressi';
+  contentEl.appendChild(legend);
+}
+
 // ---------- MISSIONE ----------
 function renderMissionTab(){
   const names = { sigillo_alba:'Sigillo dell’Alba', sigillo_meriggio:'Sigillo del Meriggio',
@@ -220,8 +290,8 @@ function renderSaveTab(){
 }
 
 // ---------- tab switching ----------
-const TABS = { party:renderPartyTab, items:renderItemsTab, mission:renderMissionTab, save:renderSaveTab };
-const TAB_ORDER = ['party','items','mission','save'];
+const TABS = { party:renderPartyTab, items:renderItemsTab, map:renderMapTab, mission:renderMissionTab, save:renderSaveTab };
+const TAB_ORDER = ['party','items','map','mission','save'];
 let navIdx = -1;
 
 function navItems(){
@@ -285,8 +355,8 @@ export function initMenu(){
 
 registerScreen('menu', {
   el,
-  enter(){
+  enter(params){
     renderInfo();
-    switchTab('party');
+    switchTab(params?.tab || 'party');
   },
 });

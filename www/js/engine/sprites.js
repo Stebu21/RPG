@@ -69,31 +69,37 @@ function hashv(tx, ty){ return (((tx|0)*73856093) ^ ((ty|0)*19349663)) >>> 0; }
 
 // ---------- pittori dei tile ----------
 function paintGrass(x, v, tall){
-  x.fillStyle = lg(x, 0, 0, 0, TILE, tall
-    ? [[0,'#3e7c32'],[1,'#346a29']]
-    : [[0,'#56a148'],[1,'#4b9040']]);
+  // base uniforme (nessun gradiente per-tile: eviterebbe striature visibili)
+  x.fillStyle = tall ? '#3a7430' : '#509a44';
   x.fillRect(0, 0, TILE, TILE);
   const r = srand(v*977+31);
+  // chiazze tonali morbide
+  for (let i=0; i<5; i++){
+    const px = r()*TILE, py = r()*TILE, pr = 7 + r()*10;
+    x.fillStyle = i%2 ? 'rgba(255,255,210,.05)' : 'rgba(0,40,0,.06)';
+    x.beginPath(); x.arc(px, py, pr, 0, Math.PI*2); x.fill();
+  }
+  // fili d'erba
   const n = tall ? 12 : 6;
   for (let i=0; i<n; i++){
     const bx = 3 + r()*(TILE-6), by = 10 + r()*(TILE-12);
     const h = tall ? 7 + r()*7 : 3.5 + r()*4;
-    x.strokeStyle = i%2 ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.16)';
+    x.strokeStyle = i%2 ? 'rgba(255,255,255,.09)' : 'rgba(0,0,0,.13)';
     x.lineWidth = 1.6; x.lineCap = 'round';
     x.beginPath(); x.moveTo(bx, by);
     x.quadraticCurveTo(bx+1.5, by-h*0.6, bx + (r()*5-2.5), by-h);
     x.stroke();
   }
-  if (tall){ // velo scuro per distinguere la zona incontri
-    x.fillStyle = 'rgba(10,30,8,.10)';
-    x.fillRect(0, 0, TILE, TILE);
-  }
 }
 
 function paintRoad(x){
-  x.fillStyle = lg(x, 0, 0, 0, TILE, [[0,'#c9ab78'],[1,'#b6976a']]);
+  x.fillStyle = '#bfa173';
   x.fillRect(0, 0, TILE, TILE);
   const r = srand(421);
+  for (let i=0; i<4; i++){ // chiazze di terra
+    x.fillStyle = i%2 ? 'rgba(255,240,200,.07)' : 'rgba(90,60,30,.08)';
+    x.beginPath(); x.arc(r()*TILE, r()*TILE, 8+r()*9, 0, Math.PI*2); x.fill();
+  }
   for (let i=0; i<7; i++){
     ell(x, 4+r()*40, 4+r()*40, 2.5+r()*2.5, 1.6+r()*1.6,
         i%2 ? 'rgba(255,255,255,.12)' : 'rgba(80,55,25,.14)');
@@ -101,7 +107,7 @@ function paintRoad(x){
 }
 
 function paintPave(x){
-  x.fillStyle = lg(x, 0, 0, 0, TILE, [[0,'#a8aebc'],[1,'#959aa9']]);
+  x.fillStyle = '#9ea4b2';
   x.fillRect(0, 0, TILE, TILE);
   const r = srand(77);
   for (let row=0; row<3; row++){
@@ -117,11 +123,16 @@ function paintPave(x){
 }
 
 function paintWater(x, f){
-  x.fillStyle = lg(x, 0, 0, 0, TILE, [[0,'#2f80c9'],[1,'#1e5da1']]);
+  x.fillStyle = '#2668ad';
   x.fillRect(0, 0, TILE, TILE);
   const ph = (f/4) * Math.PI * 2;
+  // riflessi tonali ampi
+  x.fillStyle = 'rgba(120,190,255,.07)';
+  x.beginPath(); x.arc(14, 30, 13, 0, Math.PI*2); x.fill();
+  x.fillStyle = 'rgba(0,20,70,.08)';
+  x.beginPath(); x.arc(36, 12, 11, 0, Math.PI*2); x.fill();
   x.lineWidth = 2; x.lineCap = 'round';
-  for (const [row, al] of [[13,.28],[27,.20],[40,.24]]){
+  for (const [row, al] of [[13,.25],[27,.17],[40,.21]]){
     x.strokeStyle = `rgba(255,255,255,${al})`;
     x.beginPath();
     for (let i=0; i<=TILE; i+=4){
@@ -130,8 +141,6 @@ function paintWater(x, f){
     }
     x.stroke();
   }
-  x.fillStyle = 'rgba(255,255,255,.06)';
-  x.fillRect(0, 0, TILE, 9);
 }
 
 function paintBridge(x){
@@ -166,48 +175,6 @@ function paintMountain(x){
   x.lineTo(33, 14); x.lineTo(30, 18); x.lineTo(27, 14); x.closePath(); x.fill();
 }
 
-function paintTree(x){
-  paintGrass(x, 0, false);
-  ell(x, 24, 42, 13, 4.5, 'rgba(0,0,0,.25)');
-  x.fillStyle = lg(x, 20, 0, 28, 0, [[0,'#7a5126'],[1,'#5d3c1b']]);
-  rr(x, 21, 28, 7, 15, 3); x.fill();
-  const leaf = (cx, cy, r)=>{
-    x.fillStyle = rg(x, cx-r*0.35, cy-r*0.4, r*1.5, [[0,'#56b246'],[0.6,'#3a8a30'],[1,'#2c6e24']]);
-    x.beginPath(); x.arc(cx, cy, r, 0, Math.PI*2); x.fill();
-  };
-  leaf(16, 24, 10); leaf(32, 24, 10); leaf(24, 14, 12);
-  ell(x, 19, 11, 4, 2.5, 'rgba(255,255,255,.22)');
-}
-
-function paintWall(x){
-  x.fillStyle = lg(x, 0, 0, 0, TILE, [[0,'#9b7c5f'],[1,'#7c6048']]);
-  x.fillRect(0, 0, TILE, TILE);
-  const r = srand(913);
-  for (let row=0; row<4; row++){
-    const off = row%2 ? -10 : 0;
-    for (let cn=0; cn<4; cn++){
-      const bx = off + cn*20 + 1, by = row*12 + 1;
-      rr(x, bx, by, 18, 10, 2.5);
-      x.fillStyle = `rgba(255,235,210,${.05 + r()*.07})`;
-      x.fill();
-      x.strokeStyle = 'rgba(50,32,18,.35)'; x.lineWidth = 1; x.stroke();
-    }
-  }
-  x.fillStyle = 'rgba(255,255,255,.10)';
-  x.fillRect(0, 0, TILE, 3);
-}
-
-function paintDoor(x){
-  paintWall(x);
-  x.fillStyle = 'rgba(30,18,8,.55)';
-  rr(x, 8, 8, 32, 40, 14); x.fill();
-  x.fillStyle = lg(x, 0, 10, 0, 46, [[0,'#9a6531'],[1,'#5f3b1a']]);
-  rr(x, 11, 11, 26, 37, 11); x.fill();
-  x.strokeStyle = 'rgba(40,22,8,.6)'; x.lineWidth = 1.5;
-  x.beginPath(); x.moveTo(24, 12); x.lineTo(24, 47); x.stroke();
-  circ(x, 30, 30, 2.6, '#ffd76a');
-}
-
 function paintFlowers(x){
   paintGrass(x, 2, false);
   const flower = (cx, cy, c)=>{
@@ -223,83 +190,383 @@ function paintFlowers(x){
   flower(16, 34, '#b58df2'); flower(37, 33, '#f3f3f3');
 }
 
-function paintTown(x){
-  paintGrass(x, 1, false);
-  const house = (bx, by, w, h, roof)=>{
-    ell(x, bx+w/2, by+h+2, w*0.55, 3, 'rgba(0,0,0,.22)');
-    x.fillStyle = lg(x, 0, by, 0, by+h, [[0,'#efe2c8'],[1,'#cdbb9a']]);
-    rr(x, bx, by, w, h, 2); x.fill();
-    x.fillStyle = lg(x, 0, by-8, 0, by+2, [[0,'#d2543c'],[1,'#a83b28']]);
-    x.beginPath();
-    x.moveTo(bx-3, by+1); x.lineTo(bx+w/2, by-9); x.lineTo(bx+w+3, by+1);
-    x.closePath(); x.fill();
-    // finestra calda
-    x.save();
-    x.shadowColor = '#ffd87a'; x.shadowBlur = 5;
-    x.fillStyle = '#ffd87a';
-    x.fillRect(bx+w*0.58, by+h*0.3, w*0.22, h*0.3);
-    x.restore();
-    x.fillStyle = '#5d3c1b';
-    rr(x, bx+w*0.18, by+h*0.4, w*0.2, h*0.6, 2); x.fill();
+// ---------- terreno con transizioni (stile 3DS) ----------
+const WALLISH = c => c === '#' || c === 'D' || c === 'A';
+const GROUNDS = new Set(['.', ',', '=', ':', 'F', 'B']);
+const FLOOR_PRI = [':', '=', '.', ','];
+
+function floorChar(getCh, tx, ty){
+  for (const [dx, dy] of [[0,1],[1,0],[-1,0],[0,-1]]){
+    const c = getCh(tx+dx, ty+dy);
+    if (FLOOR_PRI.includes(c)) return c;
+    if (c === 'F') return '.';
+  }
+  return '.';
+}
+
+// decorazioni sparse deterministiche sull'erba (sassi, ciuffi, fiorellini)
+function grassDeco(ctx, x, y, tx, ty){
+  const h = hashv(tx, ty);
+  if ((h >>> 6) % 6) return;
+  const r = srand(h);
+  const dx = x + 8 + r()*32, dy = y + 8 + r()*32;
+  const kind = h % 3;
+  if (kind === 0){ // fiorellino
+    const c = ['#ef7d9d','#ffd166','#cfe3ff'][(h>>>3)%3];
+    for (let i=0; i<4; i++){
+      const a = i/4 * Math.PI*2 + 0.6;
+      circ(ctx, dx + Math.cos(a)*2.2, dy + Math.sin(a)*2.2, 1.8, c);
+    }
+    circ(ctx, dx, dy, 1.4, '#fff3c0');
+  } else if (kind === 1){ // sassolini
+    ell(ctx, dx, dy, 3, 2, 'rgba(255,255,255,.16)');
+    ell(ctx, dx+5, dy+3, 2.2, 1.5, 'rgba(0,0,0,.15)');
+  } else { // ciuffo chiaro
+    ctx.strokeStyle = 'rgba(220,255,190,.30)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    for (const o of [-3, 0, 3]){
+      ctx.beginPath(); ctx.moveTo(dx+o, dy+4);
+      ctx.quadraticCurveTo(dx+o+1, dy-2, dx+o+2.5, dy-5);
+      ctx.stroke();
+    }
+  }
+}
+
+// riva animata dove l'acqua incontra la terra
+function shoreEdges(ctx, x, y, t, tx, ty, getCh){
+  const land = c => c !== '~' && c !== ' ';
+  const ph = Math.sin(t/420 + (tx+ty)*1.7);
+  ctx.lineCap = 'round';
+  const edge = (x0, y0, x1, y1)=>{
+    ctx.strokeStyle = 'rgba(235,215,165,.85)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${.35 + ph*.2})`; ctx.lineWidth = 2;
+    const o = 3 + ph*1.5;
+    const nx = (y1-y0) ? o : 0, ny = (x1-x0) ? o : 0; // offset verso l'acqua
+    ctx.beginPath(); ctx.moveTo(x0+nx, y0+ny); ctx.lineTo(x1+nx, y1+ny); ctx.stroke();
   };
-  house(4, 18, 19, 16);
-  house(26, 24, 18, 14);
+  if (land(getCh(tx, ty-1))) edge(x+1, y+2, x+TILE-1, y+2);
+  if (land(getCh(tx, ty+1))) edge(x+1, y+TILE-2, x+TILE-1, y+TILE-2);
+  if (land(getCh(tx-1, ty))) edge(x+2, y+1, x+2, y+TILE-1);
+  if (land(getCh(tx+1, ty))) edge(x+TILE-2, y+1, x+TILE-2, y+TILE-1);
 }
 
-function paintGateS(x){ // porta del Sacro Monte
-  x.fillStyle = lg(x, 0, 0, 0, TILE, [[0,'#4c463c'],[1,'#36312a']]);
-  x.fillRect(0, 0, TILE, TILE);
-  x.fillStyle = rg(x, 24, 26, 26, [[0,'rgba(255,224,130,.95)'],[0.55,'rgba(255,196,80,.5)'],[1,'rgba(255,180,60,0)']]);
-  x.fillRect(0, 0, TILE, TILE);
-  x.strokeStyle = '#ffd76a'; x.lineWidth = 3; x.lineCap = 'round';
-  x.beginPath();
-  x.moveTo(12, 44); x.lineTo(12, 22); x.arc(24, 22, 12, Math.PI, 0); x.lineTo(36, 44);
-  x.stroke();
-  x.fillStyle = 'rgba(20,12,40,.85)';
-  x.beginPath();
-  x.moveTo(15, 44); x.lineTo(15, 23); x.arc(24, 23, 9, Math.PI, 0); x.lineTo(33, 44);
-  x.closePath(); x.fill();
-  for (const [sx, sy] of [[8,10],[40,8],[34,38],[10,36]]) circ(x, sx, sy, 1.4, '#ffe9a8');
+// bordo morbido dove strada/pavé incontrano l'erba
+function roadEdges(ctx, x, y, tx, ty, getCh){
+  const grass = c => c === '.' || c === ',' || c === 'F';
+  ctx.fillStyle = 'rgba(40,60,30,.18)';
+  if (grass(getCh(tx, ty-1))) ctx.fillRect(x, y, TILE, 2.5);
+  if (grass(getCh(tx, ty+1))) ctx.fillRect(x, y+TILE-2.5, TILE, 2.5);
+  if (grass(getCh(tx-1, ty))) ctx.fillRect(x, y, 2.5, TILE);
+  if (grass(getCh(tx+1, ty))) ctx.fillRect(x+TILE-2.5, y, 2.5, TILE);
 }
 
-function paintGateA(x){ // porta dell'Accademia
-  paintWall(x);
-  x.fillStyle = 'rgba(15,18,40,.5)';
-  rr(x, 6, 6, 36, 42, 16); x.fill();
-  x.fillStyle = lg(x, 0, 8, 0, 48, [[0,'#41599f'],[1,'#222f57']]);
-  rr(x, 9, 9, 30, 39, 13); x.fill();
-  x.strokeStyle = '#e8c558'; x.lineWidth = 2;
-  rr(x, 12, 12, 24, 33, 10); x.stroke();
-  x.save();
-  x.shadowColor = '#ffe9a8'; x.shadowBlur = 6;
-  circ(x, 24, 24, 4.5, '#e8c558');
-  x.restore();
-}
-
-// ---------- drawTile pubblico ----------
-export function drawTile(ctx, ch, x, y, t, tx=0, ty=0){
-  let key = ch, painter = null;
+export function drawGround(ctx, ch, x, y, t, tx, ty, getCh){
   switch(ch){
-    case '.': { const v = hashv(tx,ty)&3; key = '.'+v; painter = c=>paintGrass(c, v, false); break; }
-    case ',': { const v = hashv(tx,ty)&3; key = ','+v; painter = c=>paintGrass(c, v, true); break; }
-    case '~': { const f = Math.floor(t/260)&3; key = '~'+f; painter = c=>paintWater(c, f); break; }
-    case '=': painter = paintRoad; break;
-    case ':': painter = paintPave; break;
-    case 'B': painter = paintBridge; break;
-    case '^': painter = paintMountain; break;
-    case 'T': painter = paintTree; break;
-    case '#': painter = paintWall; break;
-    case 'D': painter = paintDoor; break;
-    case 'F': painter = paintFlowers; break;
-    case '1': case '2': case '3': case '4': case '5': key = 'town'; painter = paintTown; break;
-    case 'S': painter = paintGateS; break;
-    case 'A': painter = paintGateA; break;
-    default:
+    case '.': case ',': {
+      const v = hashv(tx,ty)&3;
+      const tall = ch === ',';
+      ctx.drawImage(tileSprite(ch+v, c=>paintGrass(c, v, tall)), x, y);
+      if (!tall) grassDeco(ctx, x, y, tx, ty);
+      break;
+    }
+    case '=':
+      ctx.drawImage(tileSprite('=', paintRoad), x, y);
+      roadEdges(ctx, x, y, tx, ty, getCh);
+      break;
+    case ':':
+      ctx.drawImage(tileSprite(':', paintPave), x, y);
+      roadEdges(ctx, x, y, tx, ty, getCh);
+      break;
+    case 'F':
+      ctx.drawImage(tileSprite('F', paintFlowers), x, y);
+      break;
+    case '~': {
+      const f = Math.floor(t/260)&3;
+      ctx.drawImage(tileSprite('~'+f, c=>paintWater(c, f)), x, y);
+      shoreEdges(ctx, x, y, t, tx, ty, getCh);
+      break;
+    }
+    case 'B':
+      ctx.drawImage(tileSprite('B', paintBridge), x, y);
+      break;
+    case '^': {
+      ctx.drawImage(tileSprite('^', paintMountain), x, y);
+      // bordo scuro dove il massiccio finisce
+      ctx.fillStyle = 'rgba(10,10,18,.25)';
+      if (getCh(tx, ty+1) !== '^' && getCh(tx, ty+1) !== ' ') ctx.fillRect(x, y+TILE-3, TILE, 3);
+      if (getCh(tx-1, ty) !== '^' && getCh(tx-1, ty) !== ' ') ctx.fillRect(x, y, 3, TILE);
+      if (getCh(tx+1, ty) !== '^' && getCh(tx+1, ty) !== ' ') ctx.fillRect(x+TILE-3, y, 3, TILE);
+      break;
+    }
+    case ' ':
       ctx.fillStyle = '#0a0c16';
       ctx.fillRect(x, y, TILE, TILE);
       return;
+    default: {
+      // oggetto alto: disegna il pavimento sottostante più adatto
+      const fc = floorChar(getCh, tx, ty);
+      drawGround(ctx, fc, x, y, t, tx, ty, getCh);
+    }
   }
-  ctx.drawImage(tileSprite(key, painter), x, y);
+  // ombra proiettata dagli edifici sul terreno (sole in alto a sinistra)
+  if (GROUNDS.has(ch) || ch === 'F'){
+    if (WALLISH(getCh(tx, ty-1))){
+      ctx.fillStyle = lg(ctx, 0, y, 0, y+14, [[0,'rgba(8,8,18,.38)'],[1,'rgba(8,8,18,0)']]);
+      ctx.fillRect(x, y, TILE, 14);
+    }
+    if (WALLISH(getCh(tx-1, ty))){
+      ctx.fillStyle = lg(ctx, x, 0, x+10, 0, [[0,'rgba(8,8,18,.25)'],[1,'rgba(8,8,18,0)']]);
+      ctx.fillRect(x, y, 10, TILE);
+    }
+  }
+}
+
+// ---------- oggetti alti (disegnati in ordine di profondità) ----------
+export const TALL = new Set(['T','#','D','1','2','3','4','5','S','A']);
+
+const ROOF1 = '#c2604a', ROOF2 = '#8e4031';
+const PLASTER1 = '#f0e4cc', PLASTER2 = '#cdbb9b';
+
+function roofTile(ctx, x, y, ridge, edgeL, edgeR){
+  ctx.fillStyle = lg(ctx, 0, y, 0, y+TILE, [[0, ROOF1], [1, ROOF2]]);
+  ctx.fillRect(x, y, TILE, TILE);
+  // file di coppi
+  ctx.strokeStyle = 'rgba(70,25,15,.4)'; ctx.lineWidth = 1.4;
+  for (let row=0; row<4; row++){
+    const yy = y + row*12 + 9;
+    const off = row%2 ? 6 : 0;
+    ctx.beginPath();
+    for (let cx=-6; cx<TILE+6; cx+=12){
+      ctx.moveTo(x+cx+off+6, yy);
+      ctx.arc(x+cx+off, yy, 6, 0, Math.PI);
+    }
+    ctx.stroke();
+  }
+  // colmo del tetto
+  if (ridge){
+    ctx.fillStyle = col(ROOF1, 0.30);
+    rr(ctx, x, y, TILE, 6, 3); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.25)';
+    ctx.fillRect(x, y+1, TILE, 1.5);
+  }
+  if (edgeL){ ctx.fillStyle = 'rgba(60,20,12,.45)'; ctx.fillRect(x, y, 2.5, TILE); }
+  if (edgeR){ ctx.fillStyle = 'rgba(60,20,12,.45)'; ctx.fillRect(x+TILE-2.5, y, 2.5, TILE); }
+}
+
+function facadeBase(ctx, x, y){
+  // muro in intonaco con gronda sporgente
+  ctx.fillStyle = lg(ctx, 0, y+10, 0, y+TILE, [[0, PLASTER1], [1, PLASTER2]]);
+  ctx.fillRect(x, y+10, TILE, TILE-10);
+  ctx.fillStyle = lg(ctx, 0, y+10, 0, y+20, [[0,'rgba(0,0,0,.35)'],[1,'rgba(0,0,0,0)']]);
+  ctx.fillRect(x, y+10, TILE, 10);
+  // gronda
+  ctx.fillStyle = lg(ctx, 0, y, 0, y+11, [[0, col(ROOF1, 0.12)], [1, ROOF2]]);
+  rr(ctx, x-1.5, y-1, TILE+3, 12, 3); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.22)';
+  ctx.fillRect(x-1.5, y-1, TILE+3, 1.6);
+  // zoccolo in pietra
+  ctx.fillStyle = 'rgba(90,80,70,.55)';
+  ctx.fillRect(x, y+TILE-5, TILE, 5);
+  ctx.fillStyle = 'rgba(0,0,0,.16)';
+  ctx.fillRect(x, y+TILE-7, TILE, 2);
+}
+
+function facade(ctx, x, y, tx, ty){
+  facadeBase(ctx, x, y);
+  const h = hashv(tx, ty);
+  if (h % 3 !== 0){
+    // finestra con luce calda
+    const wx = x + 14 + (h>>>5)%8, wy = y + 21;
+    ctx.fillStyle = '#6e5638';
+    rr(ctx, wx-2, wy-2, 18, 18, 3.5); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = '#ffd87a'; ctx.shadowBlur = 7;
+    ctx.fillStyle = lg(ctx, 0, wy, 0, wy+14, [[0,'#ffe9a8'],[1,'#f0b450']]);
+    rr(ctx, wx, wy, 14, 14, 2); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(110,86,56,.9)'; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(wx+7, wy); ctx.lineTo(wx+7, wy+14);
+    ctx.moveTo(wx, wy+7); ctx.lineTo(wx+14, wy+7);
+    ctx.stroke();
+    // davanzale con fiori (a volte)
+    if ((h>>>7) % 2){
+      ctx.fillStyle = '#7a5a38';
+      rr(ctx, wx-3, wy+14, 20, 3.5, 1.5); ctx.fill();
+      circ(ctx, wx+3, wy+13, 2, '#ef7d9d');
+      circ(ctx, wx+9, wy+12.5, 2, '#ffd166');
+    }
+  } else {
+    // travi a graticcio
+    ctx.strokeStyle = 'rgba(110,86,56,.6)'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x+6, y+14); ctx.lineTo(x+TILE-8, y+TILE-8);
+    ctx.moveTo(x+TILE-8, y+14); ctx.lineTo(x+6, y+TILE-8);
+    ctx.stroke();
+  }
+}
+
+function doorFacade(ctx, x, y, t){
+  facadeBase(ctx, x, y);
+  // porta ad arco in legno
+  ctx.fillStyle = 'rgba(40,26,12,.6)';
+  ctx.beginPath();
+  ctx.moveTo(x+12, y+TILE-4); ctx.lineTo(x+12, y+24);
+  ctx.arc(x+24, y+24, 12, Math.PI, 0);
+  ctx.lineTo(x+36, y+TILE-4);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = lg(ctx, 0, y+14, 0, y+TILE, [[0,'#9a6531'],[1,'#5f3b1a']]);
+  ctx.beginPath();
+  ctx.moveTo(x+14.5, y+TILE-4); ctx.lineTo(x+14.5, y+25);
+  ctx.arc(x+24, y+25, 9.5, Math.PI, 0);
+  ctx.lineTo(x+33.5, y+TILE-4);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(40,22,8,.55)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(x+24, y+16.5); ctx.lineTo(x+24, y+TILE-4); ctx.stroke();
+  circ(ctx, x+29, y+33, 2.2, '#ffd76a');
+  // lanterna accesa
+  const gl = 0.65 + Math.sin(t/300)*0.25;
+  ctx.save();
+  ctx.shadowColor = '#ffce6a'; ctx.shadowBlur = 9*gl;
+  ctx.fillStyle = `rgba(255,214,106,${gl})`;
+  circ(ctx, x+7, y+22, 2.6, ctx.fillStyle);
+  ctx.restore();
+  ctx.strokeStyle = '#3a2a18'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(x+7, y+16); ctx.lineTo(x+7, y+19); ctx.stroke();
+  // gradino
+  ctx.fillStyle = 'rgba(150,140,130,.8)';
+  rr(ctx, x+11, y+TILE-4, 26, 4, 2); ctx.fill();
+}
+
+function wallCube(ctx, x, y, tx, ty, getCh){
+  const isW = c => c === '#' || c === 'D';
+  if (isW(getCh(tx, ty+1))){
+    roofTile(ctx, x, y, !isW(getCh(tx, ty-1)), !isW(getCh(tx-1, ty)), !isW(getCh(tx+1, ty)));
+  } else {
+    facade(ctx, x, y, tx, ty);
+  }
+}
+
+function tree(ctx, x, y, t, tx, ty){
+  const cx = x + TILE/2;
+  const sway = Math.sin(t/850 + (tx*37 + ty*17) % 9) * 1.6;
+  ell(ctx, cx, y+43, 14, 4.5, 'rgba(0,0,0,.28)');
+  // tronco con radici
+  ctx.fillStyle = lg(ctx, cx-5, 0, cx+5, 0, [[0,'#7e5429'],[1,'#5a3a1a']]);
+  rr(ctx, cx-4, y+16, 8, 27, 3); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx-4, y+43); ctx.lineTo(cx-9, y+44); ctx.lineTo(cx-4, y+38); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx+4, y+43); ctx.lineTo(cx+9, y+44); ctx.lineTo(cx+4, y+38); ctx.closePath(); ctx.fill();
+  // chioma a strati (si estende sopra il tile)
+  const leaf = (lx, ly, r, f)=>{
+    ctx.fillStyle = rg(ctx, lx-r*0.4, ly-r*0.45, r*1.7,
+      [[0, col('#4ea83e', 0.25+f)], [0.6, col('#3a8a30', f)], [1, col('#2a661f', f)]]);
+    ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI*2); ctx.fill();
+  };
+  leaf(cx-10+sway*0.5, y+18, 11, -0.04);
+  leaf(cx+10+sway*0.8, y+18, 11, -0.02);
+  leaf(cx+sway*0.6, y+24, 12, 0.02);
+  leaf(cx+sway, y+4, 13, 0.05);
+  // luce di bordo
+  ctx.strokeStyle = 'rgba(255,255,220,.28)'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx-3+sway, y+4, 10, Math.PI*1.05, Math.PI*1.6); ctx.stroke();
+  if (hashv(tx,ty) % 5 === 0){ // bacche
+    circ(ctx, cx-7+sway*0.5, y+14, 1.7, '#e25b5b');
+    circ(ctx, cx+5+sway*0.8, y+22, 1.7, '#e25b5b');
+    circ(ctx, cx+1+sway, y+8, 1.7, '#e25b5b');
+  }
+}
+
+function hamlet(ctx, x, y, tx, ty){
+  const h = hashv(tx, ty);
+  const house = (bx, by, w, hh, flip)=>{
+    ell(ctx, bx+w/2, by+hh+2, w*0.58, 3.2, 'rgba(0,0,0,.25)');
+    ctx.fillStyle = lg(ctx, 0, by, 0, by+hh, [[0, PLASTER1], [1, PLASTER2]]);
+    rr(ctx, bx, by, w, hh, 2); ctx.fill();
+    ctx.fillStyle = lg(ctx, 0, by-9, 0, by+2, [[0, col(ROOF1, 0.1)], [1, ROOF2]]);
+    ctx.beginPath();
+    ctx.moveTo(bx-3, by+1); ctx.lineTo(bx+w/2, by-10); ctx.lineTo(bx+w+3, by+1);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(bx-2, by); ctx.lineTo(bx+w/2, by-9); ctx.stroke();
+    // camino
+    ctx.fillStyle = '#8a6a52';
+    ctx.fillRect(bx+(flip?3:w-7), by-7, 4, 7);
+    ctx.save();
+    ctx.shadowColor = '#ffd87a'; ctx.shadowBlur = 5;
+    ctx.fillStyle = '#ffd87a';
+    ctx.fillRect(bx+(flip?w-10:4)+w*0.28, by+hh*0.3, 5.5, 5.5);
+    ctx.restore();
+    ctx.fillStyle = '#5d3c1b';
+    rr(ctx, bx+w*0.2, by+hh*0.42, w*0.2, hh*0.58, 1.8); ctx.fill();
+  };
+  house(x+3, y+14 + (h%2)*3, 21, 18, false);
+  house(x+26, y+22, 19, 15, true);
+  // sentierino
+  ell(ctx, x+24, y+44, 7, 2.5, 'rgba(200,170,110,.5)');
+}
+
+function gateS(ctx, x, y, t){
+  const pulse = 0.6 + Math.sin(t/420)*0.25;
+  ctx.save();
+  ctx.fillStyle = rg(ctx, x+24, y+24, 30, [[0,`rgba(255,224,130,${pulse})`],[0.6,`rgba(255,196,80,${pulse*0.45})`],[1,'rgba(255,180,60,0)']]);
+  ctx.fillRect(x-8, y-10, TILE+16, TILE+14);
+  ctx.restore();
+  // colonne di pietra
+  ctx.fillStyle = lg(ctx, 0, y-6, 0, y+44, [[0,'#9a9183'],[1,'#5e564a']]);
+  rr(ctx, x+7, y-4, 8, 48, 3); ctx.fill();
+  rr(ctx, x+33, y-4, 8, 48, 3); ctx.fill();
+  // architrave
+  rr(ctx, x+4, y-8, 40, 8, 3.5); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.2)';
+  ctx.fillRect(x+4, y-8, 40, 2);
+  // varco luminoso
+  ctx.fillStyle = lg(ctx, 0, y, 0, y+44, [[0,`rgba(255,236,170,${pulse})`],[1,'rgba(120,80,200,.35)']]);
+  ctx.fillRect(x+15, y, 18, 44);
+  // scintille
+  for (const [sx, sy, ph] of [[10,6,0],[40,2,2],[36,34,4],[8,30,5]]){
+    const a = 0.4 + Math.sin(t/260 + ph)*0.4;
+    ctx.fillStyle = `rgba(255,233,168,${Math.max(0,a)})`;
+    circ(ctx, x+sx, y+sy, 1.6, ctx.fillStyle);
+  }
+}
+
+function gateA(ctx, x, y, t){
+  facadeBase(ctx, x, y);
+  // grande portale blu dell'Accademia
+  ctx.fillStyle = 'rgba(15,18,40,.55)';
+  ctx.beginPath();
+  ctx.moveTo(x+8, y+TILE-3); ctx.lineTo(x+8, y+20);
+  ctx.arc(x+24, y+20, 16, Math.PI, 0);
+  ctx.lineTo(x+40, y+TILE-3);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = lg(ctx, 0, y+6, 0, y+TILE, [[0,'#41599f'],[1,'#222f57']]);
+  ctx.beginPath();
+  ctx.moveTo(x+11, y+TILE-3); ctx.lineTo(x+11, y+21);
+  ctx.arc(x+24, y+21, 13, Math.PI, 0);
+  ctx.lineTo(x+37, y+TILE-3);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#e8c558'; ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(x+14, y+TILE-3); ctx.lineTo(x+14, y+22);
+  ctx.arc(x+24, y+22, 10, Math.PI, 0);
+  ctx.lineTo(x+34, y+TILE-3);
+  ctx.stroke();
+  const gl = 0.7 + Math.sin(t/380)*0.3;
+  ctx.save();
+  ctx.shadowColor = '#ffe9a8'; ctx.shadowBlur = 8*gl;
+  circ(ctx, x+24, y+26, 4.2, '#e8c558');
+  ctx.restore();
+}
+
+export function drawObject(ctx, ch, x, y, t, tx, ty, getCh){
+  switch(ch){
+    case 'T': tree(ctx, x, y, t, tx, ty); break;
+    case '#': wallCube(ctx, x, y, tx, ty, getCh); break;
+    case 'D': doorFacade(ctx, x, y, t); break;
+    case '1': case '2': case '3': case '4': case '5': hamlet(ctx, x, y, tx, ty); break;
+    case 'S': gateS(ctx, x, y, t); break;
+    case 'A': gateA(ctx, x, y, t); break;
+  }
 }
 
 export const BLOCKED = new Set(['~','^','T','#',' ']);

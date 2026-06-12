@@ -6,7 +6,7 @@ import { ZONES, MONSTERS } from '../data/monsters.js';
 import { ITEMS, SHOPS, INN_PRICES } from '../data/items.js';
 import { CHARACTERS } from '../data/characters.js';
 import { G, fullHeal, addCharacter, addItem } from '../engine/state.js';
-import { TILE, drawTile, drawActor, drawChest, BLOCKED } from '../engine/sprites.js';
+import { TILE, drawGround, drawObject, TALL, drawActor, drawChest, BLOCKED } from '../engine/sprites.js';
 import { Input } from '../engine/input.js';
 import { playMusic, sfx } from '../engine/audio.js';
 import { registerScreen, show, currentScreen } from '../engine/ui.js';
@@ -381,23 +381,49 @@ function render(ts){
 
   ctx.fillStyle = '#0a0c16';
   ctx.fillRect(0, 0, W, H);
+  const getCh = (tx, ty)=>tileAt(tx, ty);
   const x0 = Math.floor(camX / TILE), y0 = Math.floor(camY / TILE);
-  for (let ty = y0; ty <= y0 + Math.ceil(H/TILE); ty++){
-    for (let tx = x0; tx <= x0 + Math.ceil(W/TILE); tx++){
-      drawTile(ctx, tileAt(tx, ty), tx*TILE - camX, ty*TILE - camY, ts, tx, ty);
+  const cols = Math.ceil(W/TILE), rows = Math.ceil(H/TILE);
+
+  // passata 1: terreno (con transizioni e ombre proiettate)
+  for (let ty = y0; ty <= y0 + rows; ty++){
+    for (let tx = x0; tx <= x0 + cols; tx++){
+      drawGround(ctx, tileAt(tx, ty), tx*TILE - camX, ty*TILE - camY, ts, tx, ty, getCh);
     }
   }
-  // trigger visibili
+
+  // passata 2: oggetti alti + personaggi, ordinati per profondità (y)
+  const items = [];
+  for (let ty = y0; ty <= y0 + rows + 1; ty++){
+    for (let tx = x0; tx <= x0 + cols; tx++){
+      const ch = tileAt(tx, ty);
+      if (!TALL.has(ch)) continue;
+      const px = tx*TILE - camX, py = ty*TILE - camY;
+      // gli oggetti calpestabili (portali, borghi) stanno dietro al giocatore
+      const walkable = !BLOCKED.has(ch);
+      items.push({ y: ty*TILE + (walkable ? 44 : 47), f: ()=>drawObject(ctx, ch, px, py, ts, tx, ty, getCh) });
+    }
+  }
   for (const t of activeTriggers()){
     const px = t.x*TILE - camX, py = t.y*TILE - camY;
-    if (px < -TILE || px > W || py < -TILE || py > H) continue;
-    if (t.type === 'npc') drawActor(ctx, px, py, t.sprite || '#b08968', 'down', 0);
-    else if (t.type === 'chest') drawChest(ctx, px, py, !!G.s.chests[t.id]);
+    if (px < -TILE || px > W || py < -TILE*1.5 || py > H) continue;
+    if (t.type === 'npc') items.push({ y: t.y*TILE + 46, f: ()=>drawActor(ctx, px, py, t.sprite || '#b08968', 'down', 0) });
+    else if (t.type === 'chest') items.push({ y: t.y*TILE + 45, f: ()=>drawChest(ctx, px, py, !!G.s.chests[t.id]) });
   }
-  // giocatore (leader del party) — camminata fluida
   const leader = CHARACTERS[G.s.party[0]] || CHARACTERS.ste;
-  drawActor(ctx, Math.round(ix) - camX, Math.round(iy) - camY, leader, player.dir,
-            player.moving ? (stepFrame + player.prog) * 0.5 : 0);
+  const pSX = Math.round(ix) - camX, pSY = Math.round(iy) - camY;
+  items.push({ y: iy + 46.5, f: ()=>drawActor(ctx, pSX, pSY, leader, player.dir,
+            player.moving ? (stepFrame + player.prog) * 0.5 : 0) });
+  items.sort((a, b)=>a.y - b.y);
+  for (const it of items) it.f();
+
+  // luce ambientale calda attorno al giocatore
+  const lg2 = ctx.createRadialGradient(pSX+TILE/2, pSY+TILE/2, 30, pSX+TILE/2, pSY+TILE/2, H*0.85);
+  lg2.addColorStop(0, 'rgba(255,235,185,.12)');
+  lg2.addColorStop(0.6, 'rgba(255,235,185,.04)');
+  lg2.addColorStop(1, 'rgba(30,30,80,.14)');
+  ctx.fillStyle = lg2;
+  ctx.fillRect(0, 0, W, H);
 }
 
 function loop(ts){
@@ -436,6 +462,10 @@ registerScreen('world', {
 export function initWorld(){
   document.getElementById('btn-menu').addEventListener('click', ()=>{
     if (!busy) show('menu');
+  });
+  // tocca il nome della località per aprire subito la mappa
+  document.getElementById('world-hud').addEventListener('click', ()=>{
+    if (!busy) show('menu', { tab:'map' });
   });
 }
 
