@@ -9,7 +9,7 @@ import { G, statsOf, expToNext } from '../engine/state.js';
 import { saveGame, SLOTS, listSaves } from '../engine/save.js';
 import { drawPortrait } from '../engine/sprites.js';
 import { sfx } from '../engine/audio.js';
-import { registerScreen, show } from '../engine/ui.js';
+import { registerScreen, show, currentScreen } from '../engine/ui.js';
 
 const el = document.getElementById('screen-menu');
 const infoEl = document.getElementById('menu-info');
@@ -58,7 +58,7 @@ function renderCharDetail(id){
   box.innerHTML = `
     <h3>${def.name} — ${def.className} Lv.${cs.level}</h3>
     <div style="display:flex;gap:10px;align-items:flex-start">
-      <canvas class="portrait" style="image-rendering:pixelated;flex-shrink:0"></canvas>
+      <canvas class="portrait" style="flex-shrink:0"></canvas>
       <p style="font-size:11px;color:#bcd">${def.desc}</p>
     </div>
     <div class="statgrid">
@@ -221,6 +221,56 @@ function renderSaveTab(){
 
 // ---------- tab switching ----------
 const TABS = { party:renderPartyTab, items:renderItemsTab, mission:renderMissionTab, save:renderSaveTab };
+const TAB_ORDER = ['party','items','mission','save'];
+let navIdx = -1;
+
+function navItems(){
+  return [...contentEl.querySelectorAll('.char-row, button.btn:not(:disabled)')];
+}
+function highlightNav(){
+  navItems().forEach((e, i)=>e.classList.toggle('key-sel', i === navIdx));
+}
+function activeTab(){
+  return document.querySelector('#menu-tabs .tab.btn-sel')?.dataset.tab || 'party';
+}
+function switchTab(tab){
+  navIdx = -1;
+  for (const b of document.querySelectorAll('#menu-tabs .tab')) b.classList.toggle('btn-sel', b.dataset.tab === tab);
+  TABS[tab]?.();
+}
+
+window.addEventListener('pad-dir', e=>{
+  if (currentScreen() !== 'menu') return;
+  const d = e.detail;
+  if (d === 'left' || d === 'right'){
+    const i = TAB_ORDER.indexOf(activeTab());
+    const ni = (i + (d === 'right' ? 1 : -1) + TAB_ORDER.length) % TAB_ORDER.length;
+    sfx('select');
+    switchTab(TAB_ORDER[ni]);
+    return;
+  }
+  const items = navItems();
+  if (!items.length) return;
+  navIdx = d === 'down'
+    ? (navIdx + 1) % items.length
+    : navIdx <= 0 ? items.length - 1 : navIdx - 1;
+  sfx('select');
+  highlightNav();
+  items[navIdx].scrollIntoView({ block:'nearest' });
+});
+window.addEventListener('pad-confirm', ()=>{
+  if (currentScreen() !== 'menu') return;
+  const items = navItems();
+  if (navIdx >= 0 && navIdx < items.length) items[navIdx].click();
+});
+window.addEventListener('pad-back', ()=>{
+  if (currentScreen() !== 'menu') return;
+  // come il tasto B: prima torna indietro nelle viste, poi chiude il menu
+  const back = [...contentEl.querySelectorAll('button.btn')].find(b=>b.textContent.includes('Indietro'));
+  navIdx = -1;
+  if (back){ sfx('cancel'); back.click(); }
+  else { sfx('cancel'); show('world', { resume:true }); }
+});
 
 export function initMenu(){
   for (const btn of document.querySelectorAll('#menu-tabs .tab')){
@@ -228,9 +278,7 @@ export function initMenu(){
       const tab = btn.dataset.tab;
       if (tab === 'close'){ sfx('cancel'); show('world', { resume:true }); return; }
       sfx('select');
-      for (const b of document.querySelectorAll('#menu-tabs .tab')) b.classList.remove('btn-sel');
-      btn.classList.add('btn-sel');
-      TABS[tab]?.();
+      switchTab(tab);
     });
   }
 }
@@ -239,8 +287,6 @@ registerScreen('menu', {
   el,
   enter(){
     renderInfo();
-    for (const b of document.querySelectorAll('#menu-tabs .tab')) b.classList.remove('btn-sel');
-    document.querySelector('#menu-tabs .tab[data-tab="party"]').classList.add('btn-sel');
-    renderPartyTab();
+    switchTab('party');
   },
 });

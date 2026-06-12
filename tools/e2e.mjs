@@ -83,8 +83,8 @@ try {
   // parla col Rettore: vai su e interagisci
   // (semplice check: niente errori finora)
 
-  // apri menu
-  await page.keyboard.press('Escape');
+  // apri menu (Spazio)
+  await page.keyboard.press('Space');
   await page.waitForSelector('#screen-menu:not(.hidden)', { timeout: 3000 });
   console.log('7. Menu OK');
   // tab missione
@@ -114,15 +114,15 @@ try {
   for (let i = 0; i < 40; i++){
     const worldBack = await page.$('#screen-world:not(.hidden)');
     if (worldBack) break;
-    // se ci sono comandi, attacca; se serve un bersaglio, tocca un nemico vivo
+    // se ci sono comandi, attacca; poi conferma il bersaglio con Ctrl
     await page.evaluate(()=>{
       const btn = [...document.querySelectorAll('#cmd-list .btn')]
         .find(b=>b.textContent.includes('Attacca') || b.textContent.includes('Continua'));
       if (btn) btn.click();
-      const e = document.querySelector('.enemy:not(.dead)');
-      if (e) e.click();
     });
-    await new Promise(r=>setTimeout(r, 500));
+    await new Promise(r=>setTimeout(r, 120));
+    await page.keyboard.press('Control');
+    await new Promise(r=>setTimeout(r, 450));
   }
   const backToWorld = await page.$('#screen-world:not(.hidden)');
   if (!backToWorld) await fail('la battaglia non si conclude');

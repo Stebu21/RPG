@@ -9,7 +9,7 @@ import { G, fullHeal, addCharacter, addItem } from '../engine/state.js';
 import { TILE, drawTile, drawActor, drawChest, BLOCKED } from '../engine/sprites.js';
 import { Input } from '../engine/input.js';
 import { playMusic, sfx } from '../engine/audio.js';
-import { registerScreen, show } from '../engine/ui.js';
+import { registerScreen, show, currentScreen } from '../engine/ui.js';
 
 const el = document.getElementById('screen-world');
 const canvas = document.getElementById('world-canvas');
@@ -102,6 +102,11 @@ function advanceDialog(){
 
 dlgBox.addEventListener('click', advanceDialog);
 
+let choiceIdx = 0;
+function choiceButtons(){ return [...choiceBox.querySelectorAll('button:not(:disabled)')]; }
+function highlightChoice(){
+  choiceButtons().forEach((b, i)=>b.classList.toggle('key-sel', i === choiceIdx));
+}
 function showChoice(options){
   busy = true;
   choiceBox.innerHTML = '';
@@ -113,9 +118,41 @@ function showChoice(options){
     b.onclick = ()=>{ if (!opt.keep){ choiceBox.classList.add('hidden'); busy = false; } opt.cb?.(); };
     choiceBox.appendChild(b);
   }
+  choiceIdx = 0;
+  highlightChoice();
   choiceBox.classList.remove('hidden');
 }
 function closeChoice(){ choiceBox.classList.add('hidden'); busy = false; }
+const choiceOpen = ()=>!choiceBox.classList.contains('hidden');
+
+// navigazione tastiera/pad delle scelte (negozio, locanda, ...)
+window.addEventListener('pad-dir', e=>{
+  if (currentScreen() !== 'world' || !choiceOpen()) return;
+  const btns = choiceButtons();
+  if (!btns.length) return;
+  if (e.detail === 'up') choiceIdx = (choiceIdx - 1 + btns.length) % btns.length;
+  else if (e.detail === 'down') choiceIdx = (choiceIdx + 1) % btns.length;
+  else return;
+  sfx('select');
+  highlightChoice();
+});
+window.addEventListener('pad-confirm', ()=>{
+  if (currentScreen() !== 'world' || !choiceOpen()) return;
+  choiceButtons()[choiceIdx]?.click();
+});
+window.addEventListener('pad-back', ()=>{
+  if (currentScreen() !== 'world') return;
+  if (choiceOpen()){
+    // come il tasto B: chiude la scelta (l'ultima voce è sempre Chiudi/No)
+    const btns = choiceButtons();
+    sfx('cancel');
+    btns[btns.length - 1]?.click();
+    dlgBox.classList.add('hidden');
+    if (!dialogQueue) busy = false;
+  } else if (dialogQueue){
+    advanceDialog(); // B scorre comunque i dialoghi, come in molti JRPG
+  }
+});
 
 // ---------- eventi ----------
 function runSteps(steps, i=0){
@@ -338,15 +375,16 @@ function render(ts){
   let camY = Math.round(iy - H/2 + TILE/2);
   const mw = Math.max(...map.tiles.map(r=>r.length)) * TILE;
   const mh = map.tiles.length * TILE;
-  camX = Math.max(0, Math.min(camX, mw - W));
-  camY = Math.max(0, Math.min(camY, mh - H));
+  // mappe più piccole della vista: centrale; altrimenti clamp ai bordi
+  camX = mw <= W ? -((W - mw) >> 1) : Math.max(0, Math.min(camX, mw - W));
+  camY = mh <= H ? -((H - mh) >> 1) : Math.max(0, Math.min(camY, mh - H));
 
-  ctx.fillStyle = '#000';
+  ctx.fillStyle = '#0a0c16';
   ctx.fillRect(0, 0, W, H);
   const x0 = Math.floor(camX / TILE), y0 = Math.floor(camY / TILE);
   for (let ty = y0; ty <= y0 + Math.ceil(H/TILE); ty++){
     for (let tx = x0; tx <= x0 + Math.ceil(W/TILE); tx++){
-      drawTile(ctx, tileAt(tx, ty), tx*TILE - camX, ty*TILE - camY, ts);
+      drawTile(ctx, tileAt(tx, ty), tx*TILE - camX, ty*TILE - camY, ts, tx, ty);
     }
   }
   // trigger visibili
@@ -356,10 +394,10 @@ function render(ts){
     if (t.type === 'npc') drawActor(ctx, px, py, t.sprite || '#b08968', 'down', 0);
     else if (t.type === 'chest') drawChest(ctx, px, py, !!G.s.chests[t.id]);
   }
-  // giocatore (leader del party)
+  // giocatore (leader del party) — camminata fluida
   const leader = CHARACTERS[G.s.party[0]] || CHARACTERS.ste;
   drawActor(ctx, Math.round(ix) - camX, Math.round(iy) - camY, leader, player.dir,
-            player.moving ? Math.floor(player.prog*2) + stepFrame : 0);
+            player.moving ? (stepFrame + player.prog) * 0.5 : 0);
 }
 
 function loop(ts){

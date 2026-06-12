@@ -48,6 +48,12 @@ initInput(
   ()=>{ if (currentScreen() === 'world' && G.s) show('menu'); },
 );
 
+// Ctrl/A confermano anche su game over e finale
+window.addEventListener('pad-confirm', ()=>{
+  if (currentScreen() === 'gameover') document.getElementById('btn-gameover-title').click();
+  else if (currentScreen() === 'ending') document.getElementById('btn-ending-title').click();
+});
+
 // la musica può partire solo dopo un gesto dell'utente (politica autoplay)
 document.addEventListener('pointerdown', ()=>resumeAudio());
 

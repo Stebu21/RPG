@@ -1,4 +1,5 @@
 // Input unificato: tastiera + D-pad touch.
+// Frecce = movimento/navigazione · Ctrl (o Invio) = conferma · Alt (o Esc) = indietro · Spazio = menu.
 
 export const Input = {
   dirs: { up:false, down:false, left:false, right:false },
@@ -20,17 +21,41 @@ export const Input = {
 
 const KEYMAP = {
   ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
-  w:'up', s:'down', a:'left', d:'right',
-  W:'up', S:'down', A:'left', D:'right',
 };
+
+// Le schermate ascoltano questi eventi per navigare i propri menu.
+function emit(name, detail){ window.dispatchEvent(new CustomEvent(name, { detail })); }
+
+function isTyping(e){
+  const t = e.target;
+  return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
+}
 
 export function initInput(onAction, onMenu){
   window.addEventListener('keydown', e=>{
+    if (isTyping(e)) return; // mai intercettare mentre si scrive in un campo
     if (!Input.enabled) return;
     const d = KEYMAP[e.key];
-    if (d){ Input.dirs[d] = true; e.preventDefault(); }
-    else if (e.key === 'Enter' || e.key === ' '){ Input.actionQueued = true; onAction?.(); e.preventDefault(); }
-    else if (e.key === 'Escape'){ onMenu?.(); }
+    if (d){
+      Input.dirs[d] = true;
+      emit('pad-dir', d);
+      e.preventDefault();
+    } else if (e.key === 'Control' || e.key === 'Enter'){
+      if (e.repeat) return;
+      Input.actionQueued = true;
+      emit('pad-confirm');
+      onAction?.();
+      e.preventDefault();
+    } else if (e.key === 'Alt' || e.key === 'Escape'){
+      if (e.repeat) return;
+      emit('pad-back');
+      e.preventDefault();
+    } else if (e.key === ' '){
+      if (e.repeat) return;
+      emit('pad-menu');
+      onMenu?.();
+      e.preventDefault();
+    }
   });
   window.addEventListener('keyup', e=>{
     const d = KEYMAP[e.key];
@@ -49,7 +74,13 @@ export function initInput(onAction, onMenu){
     btn.addEventListener('mouseleave', off);
   }
   const act = document.getElementById('btn-action');
-  const fire = e=>{ e.preventDefault(); Input.actionQueued = true; onAction?.(); };
+  const fire = e=>{ e.preventDefault(); Input.actionQueued = true; emit('pad-confirm'); onAction?.(); };
   act.addEventListener('touchstart', fire, {passive:false});
   act.addEventListener('mousedown', fire);
+
+  // pulsante B = indietro (come il tasto B del Game Boy)
+  const back = document.getElementById('btn-back');
+  const fireBack = e=>{ e.preventDefault(); emit('pad-back'); };
+  back.addEventListener('touchstart', fireBack, {passive:false});
+  back.addEventListener('mousedown', fireBack);
 }

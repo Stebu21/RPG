@@ -40,11 +40,13 @@
 
   <!-- MONDO -->
   <div id="screen-world" class="screen hidden">
-    <canvas id="world-canvas" width="240" height="160"></canvas>
+    <canvas id="world-canvas" width="960" height="576"></canvas>
+    <div id="world-vignette"></div>
     <div id="world-hud">
       <span id="hud-location"></span>
     </div>
     <button id="btn-menu" class="hud-btn">MENU</button>
+    <div id="key-hints">Frecce muovi &middot; Ctrl conferma &middot; Alt indietro &middot; Spazio menu</div>
     <div id="dialog-box" class="hidden">
       <div id="dialog-name"></div>
       <div id="dialog-text"></div>
@@ -58,6 +60,7 @@
         <button class="dpad-btn" id="dpad-right" data-dir="right">&#9654;</button>
         <button class="dpad-btn" id="dpad-down" data-dir="down">&#9660;</button>
       </div>
+      <button id="btn-back">B</button>
       <button id="btn-action">A</button>
     </div>
   </div>
@@ -65,7 +68,8 @@
   <!-- BATTAGLIA -->
   <div id="screen-battle" class="screen hidden">
     <div id="battle-zone">
-      <div id="battle-enemies"></div>
+      <canvas id="battle-canvas"></canvas>
+      <div id="battle-pops"></div>
       <div id="battle-fx"></div>
     </div>
     <div id="battle-log"></div>
@@ -96,7 +100,7 @@
   <!-- GAME OVER -->
   <div id="screen-gameover" class="screen hidden">
     <div class="title-inner">
-      <h1 class="game-title" style="color:#c0392b">GAME OVER</h1>
+      <h1 class="game-title" style="color:#e25b5b">GAME OVER</h1>
       <p class="small">Il tempo si è fermato per la squadra...</p>
       <div class="btn-row" style="justify-content:center">
         <button id="btn-gameover-title" class="btn">TORNA AL TITOLO</button>
@@ -107,7 +111,7 @@
   <!-- FINALE -->
   <div id="screen-ending" class="screen hidden">
     <div class="title-inner">
-      <h1 class="game-title" style="color:#f1c40f">FINE</h1>
+      <h1 class="game-title">FINE</h1>
       <div id="ending-text" class="panel" style="max-width:480px;text-align:left"></div>
       <div class="btn-row" style="justify-content:center">
         <button id="btn-ending-title" class="btn">TITOLO</button>

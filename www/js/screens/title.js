@@ -88,6 +88,9 @@ export function initTitle(){
     saveBox.classList.remove('hidden');
     renderSlots();
   });
+  // Invio nei campi: passa al PIN o accedi direttamente
+  nameIn.addEventListener('keydown', e=>{ if (e.key === 'Enter') pinIn.focus(); });
+  pinIn.addEventListener('keydown', e=>{ if (e.key === 'Enter') document.getElementById('btn-login').click(); });
   document.getElementById('btn-logout').addEventListener('click', ()=>{
     sfx('cancel');
     G.account = null;
