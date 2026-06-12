@@ -309,6 +309,8 @@ function computeDamage(user, target, move){
   } else {
     dmg = (uMag * buffMult(user,'atk') * 2.2 + (move.power||0) * 1.8) * v * em - tSpr * 1.2;
   }
+  // bilanciamento a favore del party: gli eroi colpiscono più forte, i mostri meno
+  dmg *= user.kind === 'ally' ? 1.25 : 0.7;
   return { dmg: Math.max(1, Math.round(dmg)), crit, em };
 }
 
@@ -520,7 +522,7 @@ function tryFlee(a){
   hideCommands();
   a.atb = 0;
   B.readyQueue.shift();
-  if (Math.random() < 0.7){
+  if (Math.random() < 0.85){
     log('Siete fuggiti!');
     endBattle('flee');
   } else {
@@ -607,7 +609,7 @@ function tickStatusesOnAct(unit){
   // veleno: danno al proprio turno; buff: scala la durata
   if (unit.statuses.veleno){
     const max = unit.kind==='ally' ? unit.st.hp : unit.maxhp;
-    const d = Math.max(1, Math.floor(max/12));
+    const d = Math.max(1, Math.floor(max/16));
     applyDamage(unit, d, false);
     popDamage(unit, d, '');
     log(`${unit.name} soffre per il veleno!`);
@@ -818,7 +820,7 @@ function tick(){
     if (B.animLock) continue;
     if (choosing && u.kind === 'enemy') { /* i nemici caricano comunque */ }
     const spd = u.kind==='ally' ? u.st.spd : u.spd;
-    u.atb += (4 + spd * 0.35) * (TICK_MS/100);
+    u.atb += (4 + spd * 0.35) * (TICK_MS/100) * (u.kind==='ally' ? 1.15 : 1);
     if (u.atb >= ATB_MAX){
       u.atb = ATB_MAX;
       if (!B.readyQueue.includes(u)) B.readyQueue.push(u);

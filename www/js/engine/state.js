@@ -65,8 +65,8 @@ export function newGame(){
     x: 9, y: 8, dir: 'down',
     flags: {},
     chests: {},
-    gold: 120,
-    items: { pozione: 4, antidoto: 1 },
+    gold: 220,
+    items: { pozione: 6, etere: 2, antidoto: 2 },
     steps: 0,
     playMin: 0,
   };

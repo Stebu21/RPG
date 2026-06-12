@@ -191,7 +191,7 @@ function paintFlowers(x){
 }
 
 // ---------- terreno con transizioni (stile 3DS) ----------
-const WALLISH = c => c === '#' || c === 'D' || c === 'A';
+const WALLISH = c => c === '#' || c === 'D' || c === 'A' || c === 'C' || c === 'W';
 const GROUNDS = new Set(['.', ',', '=', ':', 'F', 'B']);
 const FLOOR_PRI = [':', '=', '.', ','];
 
@@ -322,7 +322,7 @@ export function drawGround(ctx, ch, x, y, t, tx, ty, getCh){
 }
 
 // ---------- oggetti alti (disegnati in ordine di profondità) ----------
-export const TALL = new Set(['T','#','D','1','2','3','4','5','S','A']);
+export const TALL = new Set(['T','#','D','1','2','3','4','5','S','A','C','W']);
 
 const ROOF1 = '#c2604a', ROOF2 = '#8e4031';
 const PLASTER1 = '#f0e4cc', PLASTER2 = '#cdbb9b';
@@ -439,12 +439,105 @@ function doorFacade(ctx, x, y, t){
 }
 
 function wallCube(ctx, x, y, tx, ty, getCh){
-  const isW = c => c === '#' || c === 'D';
+  const isW = c => c === '#' || c === 'D' || c === 'C' || c === 'W';
   if (isW(getCh(tx, ty+1))){
     roofTile(ctx, x, y, !isW(getCh(tx, ty-1)), !isW(getCh(tx-1, ty)), !isW(getCh(tx+1, ty)));
   } else {
     facade(ctx, x, y, tx, ty);
   }
+}
+
+// chiesa romanica: facciata in pietra chiara con timpano, rosone e portale
+function church(ctx, x, y){
+  const top = y - 16;
+  // timpano triangolare con croce
+  ctx.fillStyle = lg(ctx, 0, top-8, 0, top+10, [[0,'#f5efe1'],[1,'#d8ccb2']]);
+  ctx.beginPath();
+  ctx.moveTo(x-2, top+8); ctx.lineTo(x+TILE/2, top-9); ctx.lineTo(x+TILE+2, top+8);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(120,100,70,.55)'; ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(x-2, top+8); ctx.lineTo(x+TILE/2, top-9); ctx.lineTo(x+TILE+2, top+8);
+  ctx.stroke();
+  // croce
+  ctx.strokeStyle = '#b89a5a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x+TILE/2, top-15); ctx.lineTo(x+TILE/2, top-7);
+  ctx.moveTo(x+TILE/2-3, top-12.5); ctx.lineTo(x+TILE/2+3, top-12.5);
+  ctx.stroke();
+  // corpo della facciata
+  ctx.fillStyle = lg(ctx, 0, top+8, 0, y+TILE, [[0,'#efe8d6'],[1,'#cfc2a4']]);
+  ctx.fillRect(x, top+8, TILE, y+TILE-(top+8));
+  // lesene laterali
+  ctx.fillStyle = 'rgba(120,100,70,.28)';
+  ctx.fillRect(x+1.5, top+8, 3, y+TILE-(top+8));
+  ctx.fillRect(x+TILE-4.5, top+8, 3, y+TILE-(top+8));
+  // rosone
+  ctx.save();
+  ctx.strokeStyle = '#b89a5a'; ctx.lineWidth = 2;
+  ctx.fillStyle = '#5b78d6';
+  ctx.beginPath(); ctx.arc(x+TILE/2, top+18, 5.5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1;
+  for (let i=0; i<4; i++){
+    const a = i/4*Math.PI;
+    ctx.beginPath();
+    ctx.moveTo(x+TILE/2-Math.cos(a)*5, top+18-Math.sin(a)*5);
+    ctx.lineTo(x+TILE/2+Math.cos(a)*5, top+18+Math.sin(a)*5);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // portale ad arco
+  ctx.fillStyle = 'rgba(60,40,18,.5)';
+  ctx.beginPath();
+  ctx.moveTo(x+15, y+TILE-2); ctx.lineTo(x+15, y+30);
+  ctx.arc(x+24, y+30, 9, Math.PI, 0);
+  ctx.lineTo(x+33, y+TILE-2);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = lg(ctx, 0, y+22, 0, y+TILE, [[0,'#8a5a2e'],[1,'#5a3a1a']]);
+  ctx.beginPath();
+  ctx.moveTo(x+17.5, y+TILE-2); ctx.lineTo(x+17.5, y+31);
+  ctx.arc(x+24, y+31, 6.5, Math.PI, 0);
+  ctx.lineTo(x+30.5, y+TILE-2);
+  ctx.closePath(); ctx.fill();
+  // scalinata
+  ctx.fillStyle = 'rgba(160,150,135,.85)';
+  rr(ctx, x+13, y+TILE-3, 22, 3, 1.5); ctx.fill();
+}
+
+// torre/campanile in pietra con cella campanaria e merli
+function tower(ctx, x, y, t){
+  const top = y - 24;
+  ell(ctx, x+TILE/2, y+TILE-3, 16, 4, 'rgba(0,0,0,.28)');
+  // corpo
+  ctx.fillStyle = lg(ctx, x+6, 0, x+TILE-6, 0, [[0,'#a59a88'],[0.5,'#8d8270'],[1,'#6e6354']]);
+  rr(ctx, x+9, top+8, TILE-18, y+TILE-(top+8)-2, 3); ctx.fill();
+  // conci di pietra
+  ctx.strokeStyle = 'rgba(40,34,26,.30)'; ctx.lineWidth = 1;
+  for (let ry=top+14; ry<y+TILE-6; ry+=8){
+    ctx.beginPath(); ctx.moveTo(x+10, ry); ctx.lineTo(x+TILE-10, ry); ctx.stroke();
+  }
+  // cella campanaria (bifora) con campana
+  ctx.fillStyle = '#2a2238';
+  rr(ctx, x+13, top+10, TILE-26, 12, 4); ctx.fill();
+  ctx.strokeStyle = '#cfc2a4'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(x+TILE/2, top+10); ctx.lineTo(x+TILE/2, top+22); ctx.stroke();
+  const swing = Math.sin(t/700) * 1.5;
+  ctx.fillStyle = '#d8b25a';
+  ctx.beginPath();
+  ctx.moveTo(x+TILE/2-3+swing, top+13);
+  ctx.quadraticCurveTo(x+TILE/2+swing, top+19, x+TILE/2+3+swing, top+13);
+  ctx.closePath(); ctx.fill();
+  // merli
+  ctx.fillStyle = '#7d7260';
+  for (const mx of [9, 17, 25, 33]){
+    if (mx+6 > TILE-9+9) continue;
+    rr(ctx, x+mx, top+2, 6, 7, 1.5); ctx.fill();
+  }
+  // feritoia
+  ctx.fillStyle = 'rgba(20,16,30,.8)';
+  rr(ctx, x+TILE/2-1.5, top+30, 3, 9, 1.5); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.12)';
+  ctx.fillRect(x+10, top+8, 2.5, y+TILE-(top+8)-4);
 }
 
 function tree(ctx, x, y, t, tx, ty){
@@ -563,13 +656,15 @@ export function drawObject(ctx, ch, x, y, t, tx, ty, getCh){
     case 'T': tree(ctx, x, y, t, tx, ty); break;
     case '#': wallCube(ctx, x, y, tx, ty, getCh); break;
     case 'D': doorFacade(ctx, x, y, t); break;
+    case 'C': church(ctx, x, y); break;
+    case 'W': tower(ctx, x, y, t); break;
     case '1': case '2': case '3': case '4': case '5': hamlet(ctx, x, y, tx, ty); break;
     case 'S': gateS(ctx, x, y, t); break;
     case 'A': gateA(ctx, x, y, t); break;
   }
 }
 
-export const BLOCKED = new Set(['~','^','T','#',' ']);
+export const BLOCKED = new Set(['~','^','T','#','C','W',' ']);
 
 // ---------- eroi e NPC sulla mappa ----------
 // `who` può essere un colore (NPC generici) oppure { color, look } di un personaggio.
@@ -674,6 +769,15 @@ export function drawActor(ctx, x, y, who, dir, phase=0){
     ctx.quadraticCurveTo(cx, headCy-headR*0.1, cx-headR*0.3, headCy-headR*0.45);
     ctx.quadraticCurveTo(cx-headR*0.65, headCy-headR*0.15, cx-headR*0.8, headCy-headR*0.5);
     ctx.closePath(); ctx.fill();
+    if (look.curly){
+      // riccioli lungo la calotta
+      for (let i=0; i<5; i++){
+        const a = Math.PI * (1.05 + i*0.225);
+        circ(ctx, cx + Math.cos(a)*(headR+0.5), headCy-0.5 + Math.sin(a)*(headR+0.5), 2.6, hair);
+      }
+      circ(ctx, cx - headR*0.5, headCy - headR*0.85, 1.4, hairHi);
+      circ(ctx, cx + headR*0.45, headCy - headR*0.9, 1.4, hairHi);
+    }
     // riflesso
     ctx.strokeStyle = hairHi; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.arc(cx-1, headCy-1, headR*0.62, Math.PI*1.15, Math.PI*1.65); ctx.stroke();
@@ -757,6 +861,14 @@ export function drawPortrait(canvas, character){
     x.beginPath(); x.arc(cx, headCy, headR+1, Math.PI*1.82, Math.PI*0.22); x.lineTo(cx, headCy); x.fill();
   } else {
     x.beginPath(); x.arc(cx, headCy-2, headR+2.5, Math.PI*0.93, Math.PI*2.07); x.fill();
+    if (look.curly){
+      for (let i=0; i<6; i++){
+        const a = Math.PI * (1.0 + i*0.2);
+        x.beginPath();
+        x.arc(cx + Math.cos(a)*(headR+2), headCy-2 + Math.sin(a)*(headR+2), 8, 0, Math.PI*2);
+        x.fill();
+      }
+    }
     if (look.longHair){
       rr(x, cx-headR-6, headCy-10, 13, headR+48, 6); x.fill();
       rr(x, cx+headR-7, headCy-10, 13, headR+48, 6); x.fill();
