@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Cronache di Varese</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="game">
+
+  <!-- SCHERMATA TITOLO / LOGIN -->
+  <div id="screen-title" class="screen">
+    <div class="title-bg"></div>
+    <div class="title-inner">
+      <h1 class="game-title">CRONACHE<br>DI VARESE</h1>
+      <p class="game-subtitle">~ La Strega del Tempo ~</p>
+      <div id="title-menu" class="panel">
+        <div id="auth-box">
+          <p class="small" id="auth-msg">Accedi o crea un account</p>
+          <input id="auth-name" type="text" maxlength="12" placeholder="Nome utente" autocomplete="off">
+          <input id="auth-pin" type="password" maxlength="8" placeholder="PIN" inputmode="numeric" autocomplete="off">
+          <div class="btn-row">
+            <button id="btn-login" class="btn">ACCEDI</button>
+            <button id="btn-register" class="btn">REGISTRATI</button>
+          </div>
+        </div>
+        <div id="save-box" class="hidden">
+          <p class="small" id="save-welcome"></p>
+          <div id="save-slots"></div>
+          <div class="btn-row">
+            <button id="btn-logout" class="btn btn-dim">ESCI</button>
+          </div>
+        </div>
+      </div>
+      <p class="credits">Un omaggio a Final Fantasy VIII &middot; Varese e dintorni</p>
+    </div>
+  </div>
+
+  <!-- MONDO -->
+  <div id="screen-world" class="screen hidden">
+    <canvas id="world-canvas" width="240" height="160"></canvas>
+    <div id="world-hud">
+      <span id="hud-location"></span>
+    </div>
+    <button id="btn-menu" class="hud-btn">MENU</button>
+    <div id="dialog-box" class="hidden">
+      <div id="dialog-name"></div>
+      <div id="dialog-text"></div>
+      <div id="dialog-next">&#9660;</div>
+    </div>
+    <div id="choice-box" class="hidden"></div>
+    <div id="touch-controls">
+      <div id="dpad">
+        <button class="dpad-btn" id="dpad-up" data-dir="up">&#9650;</button>
+        <button class="dpad-btn" id="dpad-left" data-dir="left">&#9664;</button>
+        <button class="dpad-btn" id="dpad-right" data-dir="right">&#9654;</button>
+        <button class="dpad-btn" id="dpad-down" data-dir="down">&#9660;</button>
+      </div>
+      <button id="btn-action">A</button>
+    </div>
+  </div>
+
+  <!-- BATTAGLIA -->
+  <div id="screen-battle" class="screen hidden">
+    <div id="battle-zone">
+      <div id="battle-enemies"></div>
+      <div id="battle-fx"></div>
+    </div>
+    <div id="battle-log"></div>
+    <div id="battle-bottom">
+      <div id="battle-commands" class="panel hidden">
+        <div id="cmd-title"></div>
+        <div id="cmd-list"></div>
+      </div>
+      <div id="battle-party" class="panel"></div>
+    </div>
+  </div>
+
+  <!-- MENU DI GIOCO -->
+  <div id="screen-menu" class="screen hidden">
+    <div id="menu-main" class="panel">
+      <div id="menu-tabs">
+        <button class="tab btn" data-tab="party">SQUADRA</button>
+        <button class="tab btn" data-tab="items">OGGETTI</button>
+        <button class="tab btn" data-tab="mission">MISSIONE</button>
+        <button class="tab btn" data-tab="save">SALVA</button>
+        <button class="tab btn" data-tab="close">CHIUDI</button>
+      </div>
+      <div id="menu-info"></div>
+      <div id="menu-content"></div>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="screen-gameover" class="screen hidden">
+    <div class="title-inner">
+      <h1 class="game-title" style="color:#c0392b">GAME OVER</h1>
+      <p class="small">Il tempo si è fermato per la squadra...</p>
+      <div class="btn-row" style="justify-content:center">
+        <button id="btn-gameover-title" class="btn">TORNA AL TITOLO</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FINALE -->
+  <div id="screen-ending" class="screen hidden">
+    <div class="title-inner">
+      <h1 class="game-title" style="color:#f1c40f">FINE</h1>
+      <div id="ending-text" class="panel" style="max-width:480px;text-align:left"></div>
+      <div class="btn-row" style="justify-content:center">
+        <button id="btn-ending-title" class="btn">TITOLO</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

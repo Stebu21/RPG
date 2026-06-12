@@ -1,0 +1,22 @@
+{
+  "name": "cronache-di-varese",
+  "version": "1.0.0",
+  "description": "RPG in italiano ambientato nella provincia di Varese",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "puppeteer-core": "^25.1.0"
+  }
+}
