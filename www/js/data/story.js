@@ -11,6 +11,26 @@
 //   { ending:true }           finale di gioco
 
 export const NPCS = {
+  // --- abitanti generici degli interni ---
+  abitante: [
+    { if:{ has:['sigillo_alba'] }, name:'Abitante',
+      lines:['Ho sentito che qualcuno sta radunando i Sigilli delle Ore. Che il cielo vi assista!'] },
+    { name:'Abitante', lines:['Benvenuti! Scusate il disordine: con tutto questo tempo impazzito non si riesce più a tenere una casa.'] },
+  ],
+  abitante2: [
+    { name:'Abitante', lines:['Una casa col camino acceso è il miglior rifugio quando le ore ballano.',
+                              'Restate quanto volete, ma non toccate la credenza.'] },
+  ],
+  bottegaio: [
+    { name:'Bottegaio', lines:['Benvenuti nella mia bottega! Avvicinatevi al bancone per vedere la merce.'] },
+  ],
+  oste: [
+    { name:'Oste', lines:['Benvenuti! Un letto caldo e una zuppa migliore di quella di mia suocera. Avvicinatevi al bancone!'] },
+  ],
+  sacerdote: [
+    { name:'Sacerdote', lines:['Questo è un luogo di pace. Avvicinatevi all’altare e la luce vi ristorerà.',
+                               'Anche quando il tempo trema, la fede resta ferma.'] },
+  ],
   rettore_cid: [
     { if:{ has:['sigillo_alba','sigillo_meriggio','sigillo_vespro','sigillo_notte'] }, name:'Rettore Cid',
       lines:['Avete i Quattro Sigilli delle Ore... La barriera del Sacro Monte cederà.',

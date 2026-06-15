@@ -417,6 +417,32 @@ function render(ts){
   items.sort((a, b)=>a.y - b.y);
   for (const it of items) it.f();
 
+  if (!map.indoor){
+    // ombre delle nuvole che scorrono sul paesaggio
+    const ct = ts / 1000;
+    ctx.fillStyle = 'rgba(12,16,44,.10)';
+    for (let i=0; i<3; i++){
+      const span = mw + 700;
+      const cx2 = ((ct * (9 + i*4) + i * 900) % span) - 350 - camX;
+      const cy2 = ((i * 530 + ct * 3) % (mh + 300)) - 150 - camY;
+      ctx.beginPath();
+      ctx.ellipse(cx2, cy2, 200 + i*50, 90 + i*25, 0.3, 0, Math.PI*2);
+      ctx.fill();
+    }
+    // particelle di luce che fluttuano
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i=0; i<12; i++){
+      const px2 = ((i*173 + ts * (0.012 + (i%4)*0.004)) % (W + 60)) - 30;
+      const py2 = ((i*271 - ts * (0.008 + (i%3)*0.005)) % (H + 60) + (H + 60)) % (H + 60) - 30;
+      const a = 0.10 + Math.sin(ts/600 + i*1.7) * 0.08;
+      if (a <= 0.02) continue;
+      ctx.fillStyle = `rgba(255,240,190,${a})`;
+      ctx.beginPath(); ctx.arc(px2, py2, 1.6 + (i%3)*0.7, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
   // luce ambientale calda attorno al giocatore
   const lg2 = ctx.createRadialGradient(pSX+TILE/2, pSY+TILE/2, 30, pSX+TILE/2, pSY+TILE/2, H*0.85);
   lg2.addColorStop(0, 'rgba(255,235,185,.12)');

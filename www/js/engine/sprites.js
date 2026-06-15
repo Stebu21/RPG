@@ -70,7 +70,7 @@ function hashv(tx, ty){ return (((tx|0)*73856093) ^ ((ty|0)*19349663)) >>> 0; }
 // ---------- pittori dei tile ----------
 function paintGrass(x, v, tall){
   // base uniforme (nessun gradiente per-tile: eviterebbe striature visibili)
-  x.fillStyle = tall ? '#3a7430' : '#509a44';
+  x.fillStyle = tall ? '#3a7e2f' : '#4fa845';
   x.fillRect(0, 0, TILE, TILE);
   const r = srand(v*977+31);
   // chiazze tonali morbide
@@ -191,9 +191,57 @@ function paintFlowers(x){
 }
 
 // ---------- terreno con transizioni (stile 3DS) ----------
-const WALLISH = c => c === '#' || c === 'D' || c === 'A' || c === 'C' || c === 'W';
-const GROUNDS = new Set(['.', ',', '=', ':', 'F', 'B']);
-const FLOOR_PRI = [':', '=', '.', ','];
+const WALLISH = c => '#DACWM'.includes(c);
+const GROUNDS = new Set(['.', ',', '=', ':', 'F', 'B', 'w', 'R']);
+const FLOOR_PRI = ['w', ':', '=', '.', ','];
+
+// pavimento in legno (interni)
+function paintPlank(x){
+  x.fillStyle = '#a8784a';
+  x.fillRect(0, 0, TILE, TILE);
+  const r = srand(551);
+  for (let row=0; row<4; row++){
+    const y0 = row*12;
+    x.fillStyle = `rgba(255,220,170,${.04 + r()*.05})`;
+    x.fillRect(0, y0, TILE, 12);
+    x.strokeStyle = 'rgba(70,40,15,.45)'; x.lineWidth = 1.2;
+    x.beginPath(); x.moveTo(0, y0+11.5); x.lineTo(TILE, y0+11.5); x.stroke();
+    // giunti sfalsati
+    const jx = (row%2 ? 14 : 32) + r()*4;
+    x.beginPath(); x.moveTo(jx, y0); x.lineTo(jx, y0+12); x.stroke();
+    // venature
+    x.strokeStyle = 'rgba(70,40,15,.18)';
+    x.beginPath(); x.moveTo(4+r()*8, y0+4+r()*4); x.lineTo(20+r()*20, y0+5+r()*4); x.stroke();
+  }
+}
+
+// tappeto rosso su legno
+function paintRug(x){
+  paintPlank(x);
+  x.fillStyle = '#a8333a';
+  rr(x, 2, 2, TILE-4, TILE-4, 6); x.fill();
+  x.strokeStyle = '#ffd76a'; x.lineWidth = 2;
+  rr(x, 6, 6, TILE-12, TILE-12, 4); x.stroke();
+  x.fillStyle = 'rgba(255,255,255,.07)';
+  rr(x, 2, 2, TILE-4, 8, 5); x.fill();
+}
+
+// parete interna in legno scuro con zoccolo
+function paintInnerWall(x){
+  x.fillStyle = lg(x, 0, 0, 0, TILE, [[0,'#4a3b50'],[1,'#332940']]);
+  x.fillRect(0, 0, TILE, TILE);
+  x.strokeStyle = 'rgba(0,0,0,.3)'; x.lineWidth = 1.4;
+  for (const px2 of [12, 24, 36]){
+    x.beginPath(); x.moveTo(px2, 4); x.lineTo(px2, TILE-8); x.stroke();
+  }
+  x.fillStyle = 'rgba(255,255,255,.07)';
+  x.fillRect(0, 0, TILE, 3);
+  // zoccolo in legno
+  x.fillStyle = '#6e4f2c';
+  x.fillRect(0, TILE-7, TILE, 7);
+  x.fillStyle = 'rgba(255,255,255,.12)';
+  x.fillRect(0, TILE-7, TILE, 1.6);
+}
 
 function floorChar(getCh, tx, ty){
   for (const [dx, dy] of [[0,1],[1,0],[-1,0],[0,-1]]){
@@ -298,6 +346,15 @@ export function drawGround(ctx, ch, x, y, t, tx, ty, getCh){
       if (getCh(tx+1, ty) !== '^' && getCh(tx+1, ty) !== ' ') ctx.fillRect(x+TILE-3, y, 3, TILE);
       break;
     }
+    case 'w':
+      ctx.drawImage(tileSprite('w', paintPlank), x, y);
+      break;
+    case 'R':
+      ctx.drawImage(tileSprite('R', paintRug), x, y);
+      break;
+    case 'M':
+      ctx.drawImage(tileSprite('M', paintInnerWall), x, y);
+      return;
     case ' ':
       ctx.fillStyle = '#0a0c16';
       ctx.fillRect(x, y, TILE, TILE);
@@ -322,13 +379,13 @@ export function drawGround(ctx, ch, x, y, t, tx, ty, getCh){
 }
 
 // ---------- oggetti alti (disegnati in ordine di profondità) ----------
-export const TALL = new Set(['T','#','D','1','2','3','4','5','S','A','C','W']);
+export const TALL = new Set(['T','#','D','1','2','3','4','5','S','A','C','W','K','l','Z','O','H','P']);
 
 const ROOF1 = '#c2604a', ROOF2 = '#8e4031';
 const PLASTER1 = '#f0e4cc', PLASTER2 = '#cdbb9b';
 
-function roofTile(ctx, x, y, ridge, edgeL, edgeR){
-  ctx.fillStyle = lg(ctx, 0, y, 0, y+TILE, [[0, ROOF1], [1, ROOF2]]);
+function roofTile(ctx, x, y, ridge, edgeL, edgeR, eave){
+  ctx.fillStyle = lg(ctx, 0, y, 0, y+TILE, [[0, ROOF1], [1, eave ? col(ROOF2, -0.22) : ROOF2]]);
   ctx.fillRect(x, y, TILE, TILE);
   // file di coppi
   ctx.strokeStyle = 'rgba(70,25,15,.4)'; ctx.lineWidth = 1.4;
@@ -441,7 +498,9 @@ function doorFacade(ctx, x, y, t){
 function wallCube(ctx, x, y, tx, ty, getCh){
   const isW = c => c === '#' || c === 'D' || c === 'C' || c === 'W';
   if (isW(getCh(tx, ty+1))){
-    roofTile(ctx, x, y, !isW(getCh(tx, ty-1)), !isW(getCh(tx-1, ty)), !isW(getCh(tx+1, ty)));
+    // l'ultima fila di tetto prima della facciata è in ombra (gronda)
+    const eave = !isW(getCh(tx, ty+2));
+    roofTile(ctx, x, y, !isW(getCh(tx, ty-1)), !isW(getCh(tx-1, ty)), !isW(getCh(tx+1, ty)), eave);
   } else {
     facade(ctx, x, y, tx, ty);
   }
@@ -651,6 +710,111 @@ function gateA(ctx, x, y, t){
   ctx.restore();
 }
 
+// ---------- arredi degli interni e props ----------
+function counter(ctx, x, y){ // bancone con piano in legno chiaro
+  ctx.fillStyle = lg(ctx, 0, y+14, 0, y+TILE, [[0,'#7e5429'],[1,'#5a3a1a']]);
+  rr(ctx, x+1, y+14, TILE-2, TILE-16, 4); ctx.fill();
+  ctx.fillStyle = lg(ctx, 0, y+8, 0, y+18, [[0,'#caa36a'],[1,'#a87c44']]);
+  rr(ctx, x-1, y+6, TILE+2, 12, 4); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.25)';
+  rr(ctx, x, y+7, TILE, 2.5, 2); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,.18)';
+  ctx.fillRect(x+1, y+TILE-4, TILE-2, 3);
+}
+
+function bed(ctx, x, y){
+  ell(ctx, x+24, y+44, 18, 4, 'rgba(0,0,0,.22)');
+  // struttura
+  ctx.fillStyle = '#6e4f2c';
+  rr(ctx, x+4, y+4, TILE-8, TILE-8, 5); ctx.fill();
+  // materasso e coperta
+  ctx.fillStyle = '#e8e2d4';
+  rr(ctx, x+6, y+6, TILE-12, 14, 4); ctx.fill();
+  ctx.fillStyle = lg(ctx, 0, y+16, 0, y+42, [[0,'#5b78d6'],[1,'#3c52a0']]);
+  rr(ctx, x+6, y+18, TILE-12, 24, 4); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.18)';
+  rr(ctx, x+6, y+19, TILE-12, 4, 2); ctx.fill();
+  // cuscino
+  ctx.fillStyle = '#fff8ea';
+  rr(ctx, x+9, y+7, TILE-18, 9, 4); ctx.fill();
+}
+
+function shelf(ctx, x, y){
+  ctx.fillStyle = lg(ctx, 0, y+2, 0, y+TILE, [[0,'#7e5429'],[1,'#4d361d']]);
+  rr(ctx, x+2, y+2, TILE-4, TILE-6, 3); ctx.fill();
+  for (const ry of [12, 26]){
+    ctx.fillStyle = '#3a2812';
+    ctx.fillRect(x+4, y+ry, TILE-8, 10);
+    // oggetti sugli scaffali
+    const r = srand((x*7+y*13+ry)>>>0);
+    for (let i=0; i<3; i++){
+      const ox = x+7 + i*12 + r()*3;
+      ctx.fillStyle = ['#c0563c','#5b9c6a','#c9b458','#7e9cd8'][Math.floor(r()*4)];
+      rr(ctx, ox, y+ry+2, 6, 7, 1.6); ctx.fill();
+    }
+  }
+  ctx.fillStyle = 'rgba(255,255,255,.12)';
+  ctx.fillRect(x+2, y+2, TILE-4, 2);
+}
+
+function table(ctx, x, y){
+  ell(ctx, x+24, y+40, 17, 5, 'rgba(0,0,0,.22)');
+  ctx.fillStyle = '#5a3a1a';
+  rr(ctx, x+10, y+22, 5, 18, 2); ctx.fill();
+  rr(ctx, x+33, y+22, 5, 18, 2); ctx.fill();
+  ctx.fillStyle = lg(ctx, 0, y+8, 0, y+26, [[0,'#b78c52'],[1,'#8a6334']]);
+  ell(ctx, x+24, y+18, 19, 11, ctx.fillStyle);
+  ctx.fillStyle = 'rgba(255,255,255,.16)';
+  ell(ctx, x+20, y+14, 8, 3.5, ctx.fillStyle);
+}
+
+function altar(ctx, x, y, t){
+  ell(ctx, x+24, y+44, 17, 4, 'rgba(0,0,0,.25)');
+  ctx.fillStyle = lg(ctx, 0, y+14, 0, y+44, [[0,'#e8e2d4'],[1,'#b8ae98']]);
+  rr(ctx, x+8, y+16, TILE-16, 27, 4); ctx.fill();
+  ctx.fillStyle = lg(ctx, 0, y+8, 0, y+18, [[0,'#f5efe1'],[1,'#cfc4ac']]);
+  rr(ctx, x+4, y+8, TILE-8, 10, 3); ctx.fill();
+  // tovaglia
+  ctx.fillStyle = '#c9b458';
+  ctx.fillRect(x+8, y+18, TILE-16, 3);
+  // candele
+  const fl = 0.6 + Math.sin(t/180)*0.25;
+  for (const cxo of [13, 35]){
+    ctx.fillStyle = '#fff8ea';
+    rr(ctx, x+cxo-1.5, y+2, 3, 8, 1.4); ctx.fill();
+    ctx.save();
+    ctx.shadowColor = '#ffce6a'; ctx.shadowBlur = 8*fl;
+    ell(ctx, x+cxo, y+1, 2, 3*fl+1, `rgba(255,206,106,${fl})`);
+    ctx.restore();
+  }
+  // libro sacro
+  ctx.fillStyle = '#a8333a';
+  rr(ctx, x+19, y+9, 10, 7, 1.5); ctx.fill();
+}
+
+function lamppost(ctx, x, y, t){
+  const fl = 0.7 + Math.sin(t/260 + x*0.1)*0.2;
+  // pozza di luce
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ell(ctx, x+24, y+42, 20*fl, 8*fl, `rgba(255,200,110,${0.10*fl})`);
+  ctx.restore();
+  ell(ctx, x+24, y+43, 7, 2.6, 'rgba(0,0,0,.3)');
+  // palo
+  ctx.fillStyle = lg(ctx, x+21, 0, x+27, 0, [[0,'#3c3c48'],[1,'#22222c']]);
+  rr(ctx, x+22, y-8, 4, 50, 2); ctx.fill();
+  // lampada
+  ctx.save();
+  ctx.shadowColor = '#ffce6a'; ctx.shadowBlur = 12*fl;
+  ctx.fillStyle = `rgba(255,214,120,${fl})`;
+  ctx.beginPath(); ctx.arc(x+24, y-10, 5, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = '#22222c'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x+24, y-10, 6.4, 0, Math.PI*2); ctx.stroke();
+  ctx.fillStyle = '#22222c';
+  ctx.beginPath(); ctx.moveTo(x+19, y-15); ctx.lineTo(x+29, y-15); ctx.lineTo(x+24, y-20); ctx.closePath(); ctx.fill();
+}
+
 export function drawObject(ctx, ch, x, y, t, tx, ty, getCh){
   switch(ch){
     case 'T': tree(ctx, x, y, t, tx, ty); break;
@@ -658,13 +822,19 @@ export function drawObject(ctx, ch, x, y, t, tx, ty, getCh){
     case 'D': doorFacade(ctx, x, y, t); break;
     case 'C': church(ctx, x, y); break;
     case 'W': tower(ctx, x, y, t); break;
+    case 'K': counter(ctx, x, y); break;
+    case 'l': bed(ctx, x, y); break;
+    case 'Z': shelf(ctx, x, y); break;
+    case 'O': table(ctx, x, y); break;
+    case 'H': altar(ctx, x, y, t); break;
+    case 'P': lamppost(ctx, x, y, t); break;
     case '1': case '2': case '3': case '4': case '5': hamlet(ctx, x, y, tx, ty); break;
     case 'S': gateS(ctx, x, y, t); break;
     case 'A': gateA(ctx, x, y, t); break;
   }
 }
 
-export const BLOCKED = new Set(['~','^','T','#','C','W',' ']);
+export const BLOCKED = new Set(['~','^','T','#','C','W','M','K','l','Z','O','H','P',' ']);
 
 // ---------- eroi e NPC sulla mappa ----------
 // `who` può essere un colore (NPC generici) oppure { color, look } di un personaggio.
