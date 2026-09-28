@@ -67,6 +67,18 @@ console.log('dopo movimento:', pos);
 if (!(pos[0] < 13 && pos[1] < 12 && pos[2] === 'vedano')) { console.error('FISICA KO'); process.exitCode = 1; }
 await page.screenshot({ path: `tools/3d-vedano2${tag}.png` });
 
+// primo piano dei personaggi: camera ravvicinata
+await go('vedano', 11, 9);
+await page.evaluate(()=>{ window.__closeup = true; });
+await wait(600);
+await page.screenshot({ path: `tools/3d-closeup${tag}.png` });
+await page.evaluate(()=>{ window.__closeup = false; });
+// in bici lungo la via
+await page.evaluate(async ()=>{ const { G } = await import('./js/engine/state.js'); G.s.items.bici = 1; G.s.flags.bici_on = true; });
+await go('vedano', 13, 16);
+await page.keyboard.down('ArrowUp'); await wait(700); await page.keyboard.up('ArrowUp'); await wait(100);
+await page.screenshot({ path: `tools/3d-bici${tag}.png` });
+await page.evaluate(async ()=>{ const { G } = await import('./js/engine/state.js'); G.s.flags.bici_on = false; });
 await go('vedano', 20, 6);
 await page.screenshot({ path: `tools/3d-parco${tag}.png` });
 await go('vedano', 6, 12);

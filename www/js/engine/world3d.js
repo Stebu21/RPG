@@ -9,7 +9,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { TILE, drawActor, BLOCKED } from './sprites.js';
+import { Person, makeBike } from './character3d.js';
 
 // ---------- util ----------
 function hash(x, y, s=0){
@@ -984,13 +984,50 @@ export class World3D {
     this.weather = { pts, pos, vel, fallSpeed, rainy, season };
   }
 
-  // ---------- attori (sprite billboard) ----------
-  actor(id){
-    let a = this.actors.get(id);
-    if (!a){ a = new ActorSprite(); this.mapGroup.add(a.mesh); this.actors.set(id, a); }
-    a.used = true;
-    return a;
+  // ---------- personaggi 3D ----------
+  person(id, who){
+    let p = this.actors.get(id);
+    if (!p){
+      p = new Person(who, id);
+      p.mesh = p.root;
+      this.mapGroup.add(p.root);
+      this.actors.set(id, p);
+    }
+    p.used = true;
+    return p;
   }
+  // indicatore sopra la testa (! … ✓) delle missioni
+  marker(id, text, x, z, h){
+    const key = 'mk:' + id;
+    let m = this.actors.get(key);
+    if (!m){
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false }));
+      sp.scale.set(0.45, 0.45, 1); sp.renderOrder = 10;
+      this.mapGroup.add(sp);
+      m = { mesh:sp, cv, tex, text:null, dispose(){ tex.dispose(); sp.material.dispose(); } };
+      this.actors.set(key, m);
+    }
+    m.used = true;
+    if (m.text !== text){
+      m.text = text;
+      const c = m.cv.getContext('2d'); c.clearRect(0,0,64,64);
+      c.font = 'bold 46px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.lineWidth = 6; c.strokeStyle = 'rgba(0,0,0,.65)'; c.fillStyle = text === '✓' ? '#7ee787' : '#ffd76a';
+      c.strokeText(text, 32, 34); c.fillText(text, 32, 34);
+      m.tex.needsUpdate = true;
+    }
+    m.mesh.visible = !!text;
+    m.mesh.position.set(x, h + 0.25 + Math.sin(this.clock * 3) * 0.06, z);
+  }
+  bike(){
+    let b = this.actors.get('bike');
+    if (!b){ const g = makeBike(); this.mapGroup.add(g); b = { mesh:g, dispose(){} }; this.actors.set('bike', b); }
+    b.used = true;
+    return b;
+  }
+
   beginActors(){ for (const a of this.actors.values()) a.used = false; }
   endActors(){
     for (const [id, a] of this.actors) if (!a.used){ this.mapGroup.remove(a.mesh); a.dispose(); this.actors.delete(id); }
@@ -1036,7 +1073,9 @@ export class World3D {
     const speedLook = opts.velocity ? new THREE.Vector3(opts.velocity.x, 0, opts.velocity.z).multiplyScalar(0.25) : new THREE.Vector3();
     tgt.add(speedLook);
     const zo = (opts.zoomOut||0) + (this.mapName === 'world' ? 4 : 0);
-    const offset = indoor ? new THREE.Vector3(0, 7.5, 7.2) : new THREE.Vector3(0, 8.2 + zo, 8.6 + zo*0.8);
+    const close = window.__closeup;   // solo per gli screenshot di verifica
+    const offset = close ? new THREE.Vector3(0, 1.6, 2.6) : indoor ? new THREE.Vector3(0, 6.4, 6.4) : new THREE.Vector3(0, 6.6 + zo, 7.2 + zo*0.8);
+    if (window.__closeup) tgt.y = 1.05;
     const k = 1 - Math.exp(-dt * 5);
     if (opts.snap){ this.camTarget.copy(tgt); } else this.camTarget.lerp(tgt, k);
     this.camPos.copy(this.camTarget).add(offset);
@@ -1075,48 +1114,3 @@ export class World3D {
   }
 }
 
-// Sprite di un personaggio: il disegno vettoriale 2D del gioco dipinto su una
-// texture ad alta risoluzione, in piedi nel mondo e con ombra 3D.
-const SPR_SCALE = 3, SPR_W = TILE, SPR_H = 64;
-class ActorSprite {
-  constructor(){
-    this.cv = document.createElement('canvas');
-    this.cv.width = SPR_W * SPR_SCALE; this.cv.height = SPR_H * SPR_SCALE;
-    this.ctx = this.cv.getContext('2d');
-    this.tex = new THREE.CanvasTexture(this.cv);
-    this.tex.colorSpace = THREE.SRGBColorSpace;
-    this.tex.anisotropy = 4;
-    const m = new THREE.MeshStandardMaterial({ map:this.tex, transparent:true, alphaTest:0.4, roughness:0.9, side:THREE.DoubleSide });
-    const geo = new THREE.PlaneGeometry(1.15, 1.15 * SPR_H / SPR_W);
-    const ph = 1.15 * SPR_H / SPR_W;
-    geo.translate(0, ph/2 - ph*4/SPR_H, 0);
-    this.mesh = new THREE.Mesh(geo, m);
-    this.mesh.castShadow = true;
-    // ombra di contatto morbida sotto i piedi
-    const sh = new THREE.Mesh(new THREE.CircleGeometry(0.3, 16), new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.3, depthWrite:false }));
-    sh.rotation.x = -Math.PI/2 + 0.35; sh.position.y = 0.02; sh.scale.set(1, 0.6, 1);
-    this.mesh.add(sh);
-    this.shadow = sh;
-    this.key = '';
-  }
-  // draw(ctx) disegna nel riquadro 48x64 con i piedi a y=60
-  paint(key, draw){
-    if (key === this.key) return;
-    this.key = key;
-    const c = this.ctx;
-    c.setTransform(1,0,0,1,0,0);
-    c.clearRect(0, 0, this.cv.width, this.cv.height);
-    c.setTransform(SPR_SCALE, 0, 0, SPR_SCALE, 0, 0);
-    draw(c);
-    this.tex.needsUpdate = true;
-  }
-  place(x, z, y=0, lean=0, hop=0){
-    this.mesh.position.set(x, y + hop, z);
-    this.mesh.rotation.set(-0.35, 0, lean);   // leggermente inclinato verso la camera
-    this.shadow.position.y = 0.02 - hop;
-    this.shadow.material.opacity = 0.3 / (1 + hop * 3);
-  }
-  dispose(){ this.tex.dispose(); this.mesh.geometry.dispose(); this.mesh.material.dispose(); }
-}
-
-export { drawActor, BLOCKED };

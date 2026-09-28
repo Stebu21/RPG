@@ -7,7 +7,7 @@ import { ZONES, MONSTERS } from '../data/monsters.js';
 import { ITEMS, SHOPS, INN_PRICES } from '../data/items.js';
 import { CHARACTERS } from '../data/characters.js';
 import { G, fullHeal, addCharacter, addItem } from '../engine/state.js';
-import { drawActor, BLOCKED } from '../engine/sprites.js';
+import { BLOCKED } from '../engine/sprites.js';
 import { World3D } from '../engine/world3d.js';
 import { Input } from '../engine/input.js';
 import { playMusic, sfx } from '../engine/audio.js';
@@ -527,72 +527,47 @@ function render(dt){
   player.bump = Math.max(0, player.bump - dt);
   W3.beginActors();
 
-  // NPC e personaggi delle missioni: respirano e guardano verso il giocatore se vicino
+  // NPC e personaggi delle missioni: si girano verso il giocatore quando è vicino
   for (const t of activeTriggers()){
     if (t.type === 'chest'){ W3.chest(t.id, t.x, t.y, !!G.s.chests[t.id]); continue; }
     if (t.type !== 'npc' && t.type !== 'quest') continue;
-    const a = W3.actor('t:' + t.x + ',' + t.y);
+    const id = 't:' + (t.npc || t.quest) + ':' + t.x + ',' + t.y;
+    const p = W3.person(id, t.sprite || '#b08968');
     const ddx = player.px - (t.x + 0.5), ddz = player.pz - (t.y + 0.5);
     const near = ddx*ddx + ddz*ddz < 6;
-    const face = !near ? 'down' : Math.abs(ddx) > Math.abs(ddz) ? (ddx < 0 ? 'left' : 'right') : (ddz < 0 ? 'up' : 'down');
-    let mark = '';
+    p.update(dt, near ? Math.atan2(ddx, ddz) : 0, 0, 0);
+    p.place(t.x + 0.5, t.y + 0.5);
     if (t.type === 'quest'){
       const st = questState(G.s, t.quest);
-      mark = !st ? '!' : st.done ? '' : (questReadyToComplete(G.s, t.quest) ? '✓' : '…');
+      const mark = !st ? '!' : st.done ? '' : (questReadyToComplete(G.s, t.quest) ? '✓' : '…');
+      W3.marker(id, mark, t.x + 0.5, t.y + 0.5, p.H * 1.25);
     }
-    const bob = Math.round(Math.sin(W3.clock * 3 + t.x) * 2);
-    a.paint(face + mark + bob, c=>{
-      drawActor(c, 0, 16, t.sprite || '#b08968', face, 0);
-      if (mark){
-        c.font = 'bold 15px system-ui, sans-serif'; c.textAlign = 'center';
-        c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.6)';
-        c.fillStyle = mark === '✓' ? '#7ee787' : '#ffd76a';
-        c.strokeText(mark, 24, 13 + bob); c.fillText(mark, 24, 13 + bob);
-      }
-    });
-    a.place(t.x + 0.5, t.y + 0.5);
   }
 
-  // giocatore
+  // giocatore: guarda nella direzione in cui si muove davvero (anche in diagonale)
   const leader = CHARACTERS[G.s.party[0]] || CHARACTERS.ste;
   const bike = onBike();
   const sp = Math.hypot(player.vx, player.vz);
-  const phase = sp > 0.2 ? player.walk : 0;
-  const frame = Math.round((phase % 1) * 8);
-  const a = W3.actor('player');
-  a.paint(`${player.dir}${frame}${bike?'b':''}`, c=>{
-    if (bike) drawBike(c, player.dir, frame % 2 === 0);
-    drawActor(c, 0, 16 - (bike ? 6 : 0), leader, player.dir, bike ? 0 : frame / 8);
-  });
-  a.place(player.px, player.pz, 0, bike ? player.lean : 0, player.hop);
+  if (sp > 0.3) player.face = Math.atan2(player.vx, player.vz);
+  const me = W3.person('player:' + (G.s.party[0] || 'ste'), leader);
+  const seat = bike ? 0.28 : 0;
+  me.update(dt, player.face ?? { down:0, right:Math.PI/2, up:Math.PI, left:-Math.PI/2 }[player.dir], bike ? 0 : sp, player.walk);
+  if (bike){
+    // in sella: gambe piegate sui pedali che girano
+    const b = W3.bike();
+    b.mesh.position.set(player.px, player.hop, player.pz);
+    b.mesh.rotation.set(0, me.angle, player.lean);
+    for (const w of b.mesh.userData.wheels) w.rotation.x += sp * dt / 0.17;
+    me.legs.forEach((l, i)=>{ const a = player.walk * Math.PI * 4 + i * Math.PI; l.hip.rotation.x = -1.1 + Math.sin(a) * 0.35; l.knee.rotation.x = 1.3 + Math.cos(a) * 0.3; });
+    me.arms.forEach(a=>{ a.sh.rotation.x = -0.9; a.el.rotation.x = -0.3; });
+  }
+  me.place(player.px, player.pz, bike ? player.lean : 0, player.hop + seat);
 
   W3.endActors();
   W3.render(dt, { x:player.px, z:player.pz }, {
     velocity: { x:player.vx, z:player.vz },
     zoomOut: bike ? Math.min(2, sp * 0.2) : 0,   // in velocità la camera si alza
   });
-}
-
-// bicicletta sotto il personaggio: due ruote e telaio (coordinate sprite 48x64)
-function drawBike(d, dir, spin){
-  const ox = 0, oy = 16;
-  const side = dir === 'left' || dir === 'right';
-  d.fillStyle = '#22222c';
-  if (side){
-    d.fillRect(ox+8, oy+36, 10, 10);
-    d.fillRect(ox+30, oy+36, 10, 10);
-    d.fillStyle = '#c0392b';
-    d.fillRect(ox+12, oy+38, 24, 3);
-  } else {
-    d.fillRect(ox+20, oy+40, 8, 10);
-    d.fillStyle = '#c0392b';
-    d.fillRect(ox+13, oy+29, 22, 3);
-    d.fillRect(ox+13, oy+26, 3, 4);
-    d.fillRect(ox+32, oy+26, 3, 4);
-  }
-  d.fillStyle = spin ? '#8a8a9a' : '#5a5a6a';
-  if (side){ d.fillRect(ox+11, oy+39, 4, 4); d.fillRect(ox+33, oy+39, 4, 4); }
-  else d.fillRect(ox+22, oy+43, 4, 4);
 }
 
 function loop(ts){
