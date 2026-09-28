@@ -16,6 +16,11 @@ const MAKE_VEHICLE = { bici:makeBike, monopattino:makeScooter, vespa:makeVespa, 
 // ---------- util ----------
 // Solo su telefoni/tablet (schermo touch o finestra stretta) la camera sta più lontana:
 // con il display piccolo la vista ravvicinata rende difficile orientarsi.
+export const ZOOM = {
+  min:0.55, max:1.8,
+  load(){ try { const z = parseFloat(localStorage.getItem('menace_zoom')); return z > 0 ? Math.min(this.max, Math.max(this.min, z)) : 1; } catch { return 1; } },
+  save(z){ try { localStorage.setItem('menace_zoom', String(z)); } catch {} },
+};
 export const MOBILE_ZOOM = ()=>{
   const touch = window.matchMedia?.('(pointer: coarse)').matches;
   const small = Math.min(window.innerWidth, window.innerHeight) < 600;
@@ -337,6 +342,7 @@ export class World3D {
     comp.addPass(new OutputPass());
 
     this.clock = 0;
+    this.zoom = ZOOM.load();
     this.mapGroup = null;
     this.actors = new Map();
     this.animated = [];   // oggetti con update(t)
@@ -1364,6 +1370,13 @@ export class World3D {
     return b;
   }
 
+  // zoom del giocatore (rotellina, +/-, pizzico): moltiplica la distanza della camera, resta salvato
+  setZoom(z){
+    this.zoom = Math.min(ZOOM.max, Math.max(ZOOM.min, z));
+    ZOOM.save(this.zoom);
+    return this.zoom;
+  }
+
   // posizione del giocatore sullo schermo (pixel del render) e distanza dalla camera
   updateXray(focus){
     if (window.__closeup){ XRAY.xrR.value = 0; return; }
@@ -1426,7 +1439,7 @@ export class World3D {
     const zo = (opts.zoomOut||0) + (this.mapName === 'world' ? 4 : 0);
     const close = window.__closeup;   // solo per gli screenshot di verifica
     const offset = close ? new THREE.Vector3(0, 1.6, 2.6) : indoor ? new THREE.Vector3(0, 6.4, 6.4) : new THREE.Vector3(0, 14 + zo, 8 + zo*0.8);   // ~60° dall'alto: le strade si vedono tra i tetti
-    if (!close) offset.multiplyScalar(MOBILE_ZOOM());   // su telefono la camera si allontana
+    if (!close) offset.multiplyScalar(MOBILE_ZOOM() * this.zoom);   // su telefono la camera si allontana; in più lo zoom del giocatore
     if (window.__closeup) tgt.y = 1.05;
     const k = 1 - Math.exp(-dt * 5);
     if (opts.snap){ this.camTarget.copy(tgt); } else this.camTarget.lerp(tgt, k);

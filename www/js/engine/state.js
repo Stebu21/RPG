@@ -86,6 +86,12 @@ export function ensureDuo(s){
 export function migrate(s){
   s.gear ||= {};
   s.items.scarpe ||= 1;                                                     // corsa con B: anche per le partite vecchie
+  if (!s.visited){                                                          // viaggio rapido: paesi già raggiunti nelle partite vecchie
+    s.visited = { varese:true };
+    const byFlag = { sigillo_alba:'vedano', sigillo_meriggio:'castiglione', sigillo_vespro:'jerago', sigillo_notte:'samarate' };
+    for (const [f, town] of Object.entries(byFlag)) if (s.flags?.[f]) s.visited[town] = true;
+    if (['vedano','castiglione','jerago','samarate','varese'].includes(s.map)) s.visited[s.map] = true;
+  }
   if (s.flags?.bici_on){ s.vehicle = 'bici'; delete s.flags.bici_on; }   // vecchio interruttore della bici
   for (const cs of Object.values(s.chars)){
     if (!cs.attr){ cs.attr = {}; cs.pts = POINTS_PER_LEVEL * (cs.level - 1); }
@@ -106,6 +112,7 @@ export function newGame(hero='ste'){
 function newGameState(hero){
   return {
     version: 4,
+    visited: {},        // paesi raggiunti (viaggio rapido)
     gear: {},
     hero,
     party: [hero, partnerOf(hero)],

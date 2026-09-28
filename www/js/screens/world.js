@@ -502,6 +502,7 @@ function fixSpawn(){
 export function loadMap(name, x, y){
   map = MAPS[name];
   G.s.map = name;
+  if (map.osm) (G.s.visited ||= {})[name] = true;     // paese visitato: raggiungibile col viaggio rapido
   G.s.x = x; G.s.y = y;
   player = newPlayer(x, y);
   fixSpawn();
@@ -560,6 +561,39 @@ window.addEventListener('keyup',   e=>{ if (e.key === 'Shift') running = false; 
 window.addEventListener('blur', ()=>{ running = false; });
 // la corsa: B / Alt tenuto premuto (come nei Pokémon) oppure Shift
 const runHeld = ()=>running || Input.backHeld;
+
+// ---------- zoom della visuale ----------
+// rotellina o +/- sul computer, due dita (pizzico) sul telefono; il valore resta salvato sul dispositivo
+const zoomBy = k=>{ if (W3 && currentScreen() === 'world') W3.setZoom(W3.zoom * k); };
+window.addEventListener('wheel', e=>{ if (currentScreen() === 'world'){ zoomBy(e.deltaY > 0 ? 1.08 : 1 / 1.08); } }, { passive:true });
+window.addEventListener('keydown', e=>{
+  if (e.target?.tagName === 'INPUT') return;
+  if (e.key === '+' || e.key === '=') zoomBy(1 / 1.12);
+  else if (e.key === '-' || e.key === '_') zoomBy(1.12);
+});
+{
+  const cv = document.getElementById('world-canvas');
+  let pinch = null;
+  const dist = t=>Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  cv.addEventListener('touchstart', e=>{ if (e.touches.length === 2 && W3) pinch = { d:dist(e.touches), z:W3.zoom }; }, { passive:true });
+  cv.addEventListener('touchmove', e=>{
+    if (!pinch || e.touches.length !== 2 || currentScreen() !== 'world') return;
+    e.preventDefault();
+    W3.setZoom(pinch.z * pinch.d / Math.max(20, dist(e.touches)));   // dita che si allargano = più vicino
+  }, { passive:false });
+  cv.addEventListener('touchend', e=>{ if (e.touches.length < 2) pinch = null; }, { passive:true });
+}
+
+// ---------- viaggio rapido ----------
+// verso l'ingresso di un paese già visitato (dal menu Mappa)
+export function visitedTowns(){ return Object.keys(G.s.visited || {}).filter(k=>MAPS[k]?.osm); }
+export function fastTravel(town){
+  if (!visitedTowns().includes(town)) return false;
+  const sp = MAPS[town].spawn;
+  loadMap(town, sp.x, sp.y);
+  player.vx = player.vz = 0;
+  return true;
+}
 document.getElementById('btn-ride').addEventListener('click', ()=>toggleRide());
 
 // mezzo in uso (solo all'aperto e se lo si possiede)

@@ -12,6 +12,7 @@ import { saveGame, SLOTS, listSaves } from '../engine/save.js';
 import { drawPortrait } from '../engine/sprites.js';
 import { sfx } from '../engine/audio.js';
 import { registerScreen, show, currentScreen } from '../engine/ui.js';
+import { visitedTowns, fastTravel } from './world.js';
 
 const el = document.getElementById('screen-menu');
 const infoEl = document.getElementById('menu-info');
@@ -344,7 +345,7 @@ function renderMapTab(){
   // portali evidenziati (con nome sulla mappa del mondo)
   x.textAlign = 'center';
   x.font = `bold ${Math.max(9, s*2.2)}px system-ui, sans-serif`;
-  for (const tr of (map.triggers||[]).filter(t=>t.type === 'portal')){
+  for (const tr of (map.triggers||[]).filter(t=>t.type === 'portal' && !t.to?.map?.includes('_int_'))){   // le case comuni non affollano la mappa
     x.fillStyle = '#fff';
     x.beginPath(); x.arc(tr.x*s+s/2, tr.y*s+s/2, s*0.8, 0, Math.PI*2); x.fill();
     x.fillStyle = '#d9534f';
@@ -372,6 +373,27 @@ function renderMapTab(){
   legend.style.cssText = 'text-align:center;font-size:11px;color:#9aa3c7;padding:4px';
   legend.innerHTML = '<span style="color:#ffd76a">●</span> Tu sei qui &nbsp;·&nbsp; <span style="color:#d9534f">●</span> Passaggi e ingressi';
   contentEl.appendChild(legend);
+
+  // viaggio rapido verso i paesi già visitati
+  const towns = visitedTowns();
+  const box = document.createElement('div');
+  box.id = 'fast-travel';
+  box.innerHTML = '<p class="ft-title">✨ Viaggio rapido</p>';
+  if (!towns.length) box.innerHTML += '<p class="ft-none">Visita un paese per poterci tornare in un attimo.</p>';
+  for (const town of towns){
+    const b = document.createElement('button');
+    b.className = 'btn'; b.dataset.town = town;
+    const here = MAPS[G.s.map].osm && G.s.map === town;
+    b.textContent = MAPS[town].name + (here ? ' (sei qui)' : '');
+    b.disabled = here;
+    b.onclick = ()=>{
+      sfx('confirm');
+      show('world', { resume:true });
+      fastTravel(town);
+    };
+    box.appendChild(b);
+  }
+  contentEl.appendChild(box);
 }
 
 // ---------- MISSIONE ----------
