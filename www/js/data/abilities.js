@@ -4,6 +4,22 @@
 // hits: numero di colpi (default 1). buff: {stat:'atk'|'def', mult, turns}
 // status: {id:'veleno'|'sonno', chance}
 
+// Mosse combinate del duo Ste + Riki: servono entrambi vivi e svegli, costano
+// MP a tutti e due e consumano anche la carica ATB del compagno (almeno a metà).
+// Il danno somma una parte magica (MAG di Ste) e una fisica (ATK di Riki).
+export const COMBOS = {
+  lama_ardente:     { name:'Lama Ardente', lv:1, mp:{ ste:4, riki:3 }, power:30, element:'fuoco', target:'enemy',
+                      desc:'Ste incendia la katana, Riki affonda il colpo.' },
+  vortice_gemello:  { name:'Vortice Gemello', lv:7, mp:{ ste:7, riki:6 }, power:24, element:'vento', target:'enemies',
+                      desc:'Un ciclone di rune e fendenti travolge tutti i nemici.' },
+  iaido_fulmine:    { name:'Iaido del Fulmine', lv:14, mp:{ ste:10, riki:9 }, power:58, element:'tuono', target:'enemy', crit:0.3,
+                      desc:'Il fulmine di Ste cade, Riki estrae nello stesso istante.' },
+  mille_lame_gelo:  { name:'Mille Lame di Gelo', lv:22, mp:{ ste:16, riki:14 }, power:40, hits:2, element:'ghiaccio', target:'enemies',
+                      desc:'Lame di ghiaccio evocate e scagliate a colpi di katana.' },
+  ora_zero:         { name:'Ora Zero', lv:35, mp:{ ste:26, riki:22 }, power:80, element:'neutro', target:'enemies',
+                      desc:'Ste ferma il tempo, Riki taglia ogni istante rimasto sospeso.' },
+};
+
 export const ABILITIES = {
   // ------- attacco base -------
   attacco: { name:'Attacca', mp:0, type:'phys', power:0, element:'neutro', target:'enemy' },

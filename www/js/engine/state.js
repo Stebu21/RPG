@@ -55,10 +55,25 @@ function newChar(id, level=1){
   return cs;
 }
 
-export function newGame(){
+// Ste e Riki: il duo protagonista, sempre in squadra. `hero` è quello
+// controllato dal giocatore, l'altro lo segue sulla mappa.
+export const DUO = ['ste', 'riki'];
+export const partnerOf = hero => hero === 'riki' ? 'ste' : 'riki';
+
+// salvataggi vecchi o party manomessi: il duo torna ai primi due posti
+export function ensureDuo(s){
+  if (!DUO.includes(s.hero)) s.hero = DUO.includes(s.party[0]) ? s.party[0] : 'ste';
+  const others = [...s.party, ...s.reserve].filter(id=>!DUO.includes(id));
+  const inParty = s.party.filter(id=>!DUO.includes(id));
+  s.party = [s.hero, partnerOf(s.hero), ...inParty].slice(0, PARTY_MAX);
+  s.reserve = others.filter(id=>!s.party.includes(id));
+}
+
+export function newGame(hero='ste'){
   return {
-    version: 2,
-    party: ['ste','riki'],
+    version: 3,
+    hero,
+    party: [hero, partnerOf(hero)],
     reserve: [],
     chars: { ste:newChar('ste',3), riki:newChar('riki',3) },
     map: 'accademia',

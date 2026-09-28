@@ -6,7 +6,7 @@ import { ITEMS } from '../data/items.js';
 import { MAPS, SIGILLI } from '../data/maps.js';
 import { missionText } from '../data/story.js';
 import { QUESTS, questProgressText } from '../data/quests.js';
-import { G, statsOf, expToNext } from '../engine/state.js';
+import { G, statsOf, expToNext, DUO } from '../engine/state.js';
 import { saveGame, SLOTS, listSaves } from '../engine/save.js';
 import { drawPortrait } from '../engine/sprites.js';
 import { sfx } from '../engine/audio.js';
@@ -75,7 +75,12 @@ function renderCharDetail(id){
   back.className = 'btn btn-dim'; back.textContent = '◀ Indietro';
   back.onclick = ()=>{ sfx('cancel'); renderPartyTab(); };
   btnRow.appendChild(back);
-  if (inParty && G.s.party.length > 1){
+  if (DUO.includes(id)){
+    const note = document.createElement('small');
+    note.style.cssText = 'color:#ffd76a;padding:6px';
+    note.textContent = 'Ste e Riki sono inseparabili: restano sempre in squadra.';
+    btnRow.appendChild(note);
+  } else if (inParty && G.s.party.length > 1){
     const b = document.createElement('button');
     b.className = 'btn'; b.textContent = 'Metti in riserva';
     b.onclick = ()=>{

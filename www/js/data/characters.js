@@ -34,7 +34,7 @@ export const CHARACTERS = {
   fabri: {
     name:'Fabri', className:'Pistolero', color:'#27ae60',
     look:{ h:'mid', build:'slim', hair:'#1a1a1a', eyes:'#1a1a2a', beard:1 },
-    desc:'Moro, magro, barbetta sempre in ordine. Ladro gentiluomo di Vedano Olona e fidanzato di Elly (che lo tiene a bada). Dice di non aver mai perso una scommessa. Mente.',
+    desc:'Moro, magro, barbetta sempre in ordine. Ladro gentiluomo della valle dell’Olona, sorpreso a «prendere in custodia» il sigillo della Collegiata; fidanzato di Elly (che lo tiene a bada). Dice di non aver mai perso una scommessa. Mente.',
     base:{ hp:52, mp:18, atk:13, def:8, mag:6, spr:8, spd:14 },
     growth:{ hp:8.8, mp:2.6, atk:2.6, def:1.7, mag:1.2, spr:1.6, spd:2.4 },
     learnset:[
@@ -60,7 +60,7 @@ export const CHARACTERS = {
   sofy: {
     name:'Sofy', className:'Chierica', color:'#f1c40f',
     look:{ h:'short', build:'slim', hair:'#c0392b', eyes:'#2e9e5b', longHair:true },
-    desc:'Un metro e sessanta di grinta, capelli rossi e occhi verdi che incantano — Ste può confermare: è la sua ragazza. Chierica della Collegiata di Castiglione: la sua luce guarisce gli amici e brucia le ombre.',
+    desc:'Un metro e sessanta di grinta, capelli rossi e occhi verdi che incantano — Ste può confermare: è la sua ragazza. Chierica della Collegiata di Castiglione, mandata a Samarate a proteggere gli operai delle officine: la sua luce guarisce gli amici e brucia le ombre.',
     base:{ hp:48, mp:30, atk:6, def:8, mag:14, spr:14, spd:8 },
     growth:{ hp:7.8, mp:4.4, atk:1.0, def:1.5, mag:2.7, spr:2.9, spd:1.3 },
     learnset:[
@@ -74,7 +74,7 @@ export const CHARACTERS = {
   elly: {
     name:'Elly', className:'Arciera Druida', color:'#2ecc71',
     look:{ h:'mid', build:'slim', hair:'#2a1a10', eyes:'#7a4a21', longHair:true },
-    desc:'Mora, capelli lunghi e occhi castani; un metro e sessantasette di curve e mira infallibile. Custode dei boschi di Samarate e fidanzata di Fabri, che richiama all’ordine con un solo sguardo.',
+    desc:'Mora, capelli lunghi e occhi castani; un metro e sessantasette di curve e mira infallibile. Custode dei boschi dell’Olona a Castiglione e fidanzata di Fabri, che richiama all’ordine con un solo sguardo.',
     base:{ hp:50, mp:22, atk:12, def:8, mag:11, spr:10, spd:13 },
     growth:{ hp:8.4, mp:3.3, atk:2.3, def:1.6, mag:2.2, spr:1.9, spd:2.2 },
     learnset:[
@@ -87,7 +87,7 @@ export const CHARACTERS = {
   mirko: {
     name:'Mirko', className:'Berserker', color:'#c0392b',
     look:{ h:'mid', build:'wide', hair:'#1a1a1a', eyes:'#1a1a2a', beard:2, baldTop:true },
-    desc:'Somiglia a Fabri, ma stempiato e con la barba ben più lunga. Ex cavatore di Samarate, braccia come tronchi, cuore d’oro: quello l’ha già dato a Vero. Quando si arrabbia, è meglio essere altrove.',
+    desc:'Somiglia a Fabri, ma stempiato e con la barba ben più lunga. Ex cavatore di Jerago, braccia come tronchi, cuore d’oro: quello l’ha già dato a Vero. Quando si arrabbia, è meglio essere altrove.',
     base:{ hp:74, mp:12, atk:18, def:9, mag:3, spr:6, spd:7 },
     growth:{ hp:12.2, mp:1.8, atk:3.5, def:1.8, mag:0.6, spr:1.2, spd:1.3 },
     learnset:[

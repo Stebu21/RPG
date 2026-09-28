@@ -54,6 +54,8 @@ try {
 
   // nuova partita
   await page.click('#save-slots button');
+  await page.waitForSelector('#hero-box:not(.hidden) .hero-card');
+  await page.click('.hero-card[data-hero="ste"]');
   await page.waitForSelector('#screen-world:not(.hidden)', { timeout: 3000 });
   console.log('3. Nuova partita OK (mondo visibile)');
 

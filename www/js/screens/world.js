@@ -6,7 +6,7 @@ import { QUESTS, questState, questAccept, questReadyToComplete } from '../data/q
 import { ZONES, MONSTERS } from '../data/monsters.js';
 import { ITEMS, SHOPS, INN_PRICES } from '../data/items.js';
 import { CHARACTERS } from '../data/characters.js';
-import { G, fullHeal, addCharacter, addItem } from '../engine/state.js';
+import { G, fullHeal, addCharacter, addItem, ensureDuo, partnerOf } from '../engine/state.js';
 import { BLOCKED } from '../engine/sprites.js';
 import { World3D } from '../engine/world3d.js';
 import { Input } from '../engine/input.js';
@@ -25,7 +25,7 @@ const choiceBox = document.getElementById('choice-box');
 
 let raf = 0;
 let map = null;
-let player = newPlayer(0, 0);
+let player = null;   // creato da loadMap/enter
 let dialogQueue = null;   // { lines, idx, onDone }
 let busy = false;         // dialogo/scelta/evento in corso
 let stepFrame = 0;
@@ -33,7 +33,70 @@ let stepFrame = 0;
 // Il giocatore si muove in modo continuo: (px, pz) è la posizione in caselle
 // (centro casella = x+0.5), (x, y) è la casella occupata usata da trigger e salvataggi.
 function newPlayer(x, y){
+  resetFollower(x + 0.5, y + 0.5);
   return { x, y, px:x+0.5, pz:y+0.5, vx:0, vz:0, dir:'down', walk:0, lean:0, bump:0, hop:0, hopV:0 };
+}
+
+// ---------- il compagno che ti segue (come Pikachu con Ash) ----------
+// Ripercorre la scia del giocatore a distanza fissa: così aggira muri e porte
+// esattamente come te, senza bisogno di un pathfinding.
+const FOLLOW_GAP = 0.85;          // caselle di distanza lungo la scia
+let trail = [];                   // punti {x,z} dal più recente al più vecchio
+let follower = { x:0, z:0, walk:0, face:0, speed:0 };
+function resetFollower(x, z){
+  trail = [{ x, z }];
+  follower = { x, z: z - 0.6, walk:0, face:0, speed:0 };   // parte un passo dietro
+}
+function updateFollower(dt){
+  const head = trail[0];
+  if (Math.hypot(player.px - head.x, player.pz - head.z) > 0.08) trail.unshift({ x:player.px, z:player.pz });
+  // punto della scia a FOLLOW_GAP dal giocatore
+  let dist = Math.hypot(player.px - trail[0].x, player.pz - trail[0].z), tx = trail[0].x, tz = trail[0].z;
+  let target = null;
+  for (let i = 1; i < trail.length; i++){
+    const a = trail[i-1], b = trail[i];
+    const seg = Math.hypot(a.x - b.x, a.z - b.z);
+    if (dist + seg >= FOLLOW_GAP){
+      const k = (FOLLOW_GAP - dist) / (seg || 1);
+      target = { x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k };
+      trail.length = i + 1;          // la scia più vecchia non serve più
+      break;
+    }
+    dist += seg; tx = b.x; tz = b.z;
+  }
+  if (!target) return;               // il giocatore è ancora troppo vicino
+  const dx = target.x - follower.x, dz = target.z - follower.z;
+  const d = Math.hypot(dx, dz);
+  follower.speed = d / Math.max(dt, 1e-3);
+  if (d > 0.01){ follower.face = Math.atan2(dx, dz); follower.walk += d * 1.6; }
+  follower.x = target.x; follower.z = target.z;
+}
+
+// battute del compagno quando gli parli (Ctrl rivolto verso di lui)
+const PARTNER_LINES = {
+  riki: [
+    [{ not:['intro_done'] }, 'Il Rettore ci aspetta. Non vorrai arrivare tardi all’unico esame che conta.'],
+    [{ not:['sigillo_alba'] }, 'Vedano, filanda, un mostro. Io taglio, tu fai le lucine. Il solito.'],
+    [{ not:['sigillo_meriggio'] }, 'Castiglione, la Collegiata. Dicono ci sia un ladro dentro. Il sigillo è nostro prima che suo.'],
+    [{ not:['sigillo_vespro'] }, 'Un cavaliere di ottocento anni. Finalmente qualcuno che sa tenere una spada.'],
+    [{ not:['sigillo_notte'] }, 'Un drago di lamiera a Samarate. E c’è Sofy: prova a non inciampare nei tuoi stessi incantesimi.'],
+    [{ not:['game_done'] }, 'Quattro sigilli. Il Sacro Monte ci aspetta. Nessun rimpianto, fratello.'],
+    [null, 'Il tempo scorre di nuovo. Andiamo a mangiare, stavolta il pranzo non lo saltiamo.'],
+  ],
+  ste: [
+    [{ not:['intro_done'] }, 'L’aula magna è di qua. Riki, prova a non addormentarti durante il discorso.'],
+    [{ not:['sigillo_alba'] }, 'La filanda di Vedano, a sud-est. Tu apri la strada, io ti copro con la magia.'],
+    [{ not:['sigillo_meriggio'] }, 'Castiglione Olona. Un ladro nella Collegiata, un’ombra sull’altare: giornata piena.'],
+    [{ not:['sigillo_vespro'] }, 'Il castello di Jerago. Ho letto che i fantasmi odiano il fuoco. O amano il fuoco. Vedremo.'],
+    [{ not:['sigillo_notte'] }, 'Samarate... sì, Sofy dovrebbe essere lì. No, non sto arrossendo. È il riflesso del drago.'],
+    [{ not:['game_done'] }, 'Abbiamo i quattro sigilli. Qualunque cosa succeda lassù, ci siamo arrivati insieme.'],
+    [null, 'Ce l’abbiamo fatta. Adesso però gli esami li correggi tu.'],
+  ],
+};
+function talkToPartner(){
+  const pid = partnerOf(G.s.hero);
+  const line = PARTNER_LINES[pid].find(([c])=>condOk(c))[1];
+  showDialog([[CHARACTERS[pid].name, line]]);
 }
 
 // ---------- util ----------
@@ -513,6 +576,9 @@ function onAction(){
   const t = triggerAt(player.x+dx, player.y+dy)
          || triggerAt(Math.floor(player.px + dx*0.8), Math.floor(player.pz + dy*0.8));
   if (t){ fireActionTrigger(t); return; }
+  // il compagno è lì davanti? due chiacchiere
+  const fx = follower.x - player.px, fz = follower.z - player.pz;
+  if (Math.hypot(fx, fz) < 1.3 && fx*dx + fz*dy > 0.2){ talkToPartner(); return; }
   // salto sul posto (a piedi): puro divertimento, ma fa scena
   if (!onBike() && player.hop === 0) player.hopV = 5;
 }
@@ -544,12 +610,19 @@ function render(dt){
     }
   }
 
+  // il compagno del duo, sempre dietro di te
+  updateFollower(dt);
+  const pid = partnerOf(G.s.hero);
+  const mate = W3.person('partner:' + pid, CHARACTERS[pid]);
+  mate.update(dt, follower.face, Math.min(6, follower.speed), follower.walk);
+  mate.place(follower.x, follower.z);
+
   // giocatore: guarda nella direzione in cui si muove davvero (anche in diagonale)
-  const leader = CHARACTERS[G.s.party[0]] || CHARACTERS.ste;
+  const leader = CHARACTERS[G.s.hero] || CHARACTERS.ste;
   const bike = onBike();
   const sp = Math.hypot(player.vx, player.vz);
   if (sp > 0.3) player.face = Math.atan2(player.vx, player.vz);
-  const me = W3.person('player:' + (G.s.party[0] || 'ste'), leader);
+  const me = W3.person('player:' + G.s.hero, leader);
   const seat = bike ? 0.28 : 0;
   me.update(dt, player.face ?? { down:0, right:Math.PI/2, up:Math.PI, left:-Math.PI/2 }[player.dir], bike ? 0 : sp, player.walk);
   if (bike){
@@ -583,6 +656,7 @@ registerScreen('world', {
   el,
   enter(params){
     G.s.quests ||= {};  // compatibilità con i salvataggi precedenti
+    ensureDuo(G.s);
     if (!params?.resume){
       map = MAPS[G.s.map];
       player = newPlayer(G.s.x, G.s.y);

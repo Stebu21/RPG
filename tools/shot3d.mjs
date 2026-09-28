@@ -44,6 +44,9 @@ await page.type('#auth-pin', '1234');
 await page.click('#btn-register');
 await page.waitForSelector('#save-box:not(.hidden)');
 await page.click('#save-slots button');
+await page.waitForSelector('#hero-box:not(.hidden) .hero-card');
+await page.screenshot({ path: 'tools/3d-scelta.png' });
+await page.click(`.hero-card[data-hero="${process.env.HERO || 'riki'}"]`);
 await page.waitForSelector('#screen-world:not(.hidden)');
 await wait(500); await skipDialogs();
 

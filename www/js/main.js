@@ -28,8 +28,9 @@ registerScreen('ending', {
       («Il tempo scorre di nuovo: nessuna scusa»).</p><br>
       <p>Riki appende la katana al muro della locanda, ma solo per la fotografia.</p><br>
       <p>Fabri giura di restituire tutto quello che ha «trovato» durante il viaggio. Nessuno gli crede.</p><br>
-      <p>Sofy e Pasq riaprono la Collegiata. Elly e Mirko ricostruiscono le officine.
-      Vero canta dal mastio di Jerago, e nelle sere d'estate, dicono, gli spiriti del lago cantano con lei.</p><br>
+      <p>Pasq riapre la Collegiata, ed Elly lo aiuta a tenere Fabri lontano dalle reliquie.
+      Sofy torna a Samarate a benedire le officine ricostruite: Ste, stranamente, trova sempre una scusa per accompagnarla.
+      Vero canta dal mastio di Jerago, Mirko la ascolta dal cortile, e nelle sere d'estate, dicono, gli spiriti del lago cantano con loro.</p><br>
       <p>E da qualche parte, tra un'ora e l'altra, una manciata di sabbia dorata
       continua a viaggiare col vento sopra le Prealpi.</p><br>
       <p style="text-align:center;color:#f1c40f">~ Grazie per aver giocato ~</p>`;

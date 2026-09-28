@@ -1,7 +1,9 @@
 // Titolo: account (registrazione/login) e slot di salvataggio.
 
 import { register, login, listSaves, loadGame, SLOTS } from '../engine/save.js';
-import { G, newGame } from '../engine/state.js';
+import { G, newGame, ensureDuo, DUO } from '../engine/state.js';
+import { CHARACTERS } from '../data/characters.js';
+import { drawPortrait } from '../engine/sprites.js';
 import { playMusic, sfx } from '../engine/audio.js';
 import { registerScreen, show } from '../engine/ui.js';
 
@@ -55,17 +57,48 @@ function renderSlots(){
   }
 }
 
+const heroBox = document.getElementById('hero-box');
+const HERO_BLURB = {
+  ste: 'Mago dell’Accademia. Magie potenti, fisico da studioso.',
+  riki: 'Samurai. Katana, colpi critici e nervi d’acciaio.',
+};
+let heroIdx = 0;
+
+// nuova partita: prima si sceglie chi interpretare tra Ste e Riki
 function startNew(slot){
   G.slot = slot;
-  G.s = newGame();
-  show('world');
+  saveBox.classList.add('hidden');
+  heroBox.classList.remove('hidden');
+  const box = document.getElementById('hero-choices');
+  box.innerHTML = '';
+  for (const id of DUO){
+    const b = document.createElement('button');
+    b.className = 'btn hero-card';
+    b.dataset.hero = id;
+    b.innerHTML = `<canvas></canvas><b>${CHARACTERS[id].name.toUpperCase()}</b><small>${HERO_BLURB[id]}</small>`;
+    drawPortrait(b.querySelector('canvas'), CHARACTERS[id]);
+    b.onclick = ()=>{ sfx('confirm'); heroBox.classList.add('hidden'); G.s = newGame(id); show('world'); };
+    box.appendChild(b);
+  }
+  heroIdx = 0; highlightHero();
 }
+function highlightHero(){
+  document.querySelectorAll('.hero-card').forEach((b, i)=>b.classList.toggle('key-sel', i === heroIdx));
+}
+const heroOpen = ()=>!heroBox.classList.contains('hidden');
+window.addEventListener('pad-dir', e=>{
+  if (!heroOpen() || (e.detail !== 'left' && e.detail !== 'right')) return;
+  heroIdx = 1 - heroIdx; sfx('select'); highlightHero();
+});
+window.addEventListener('pad-confirm', ()=>{ if (heroOpen()) document.querySelectorAll('.hero-card')[heroIdx]?.click(); });
+window.addEventListener('pad-back', ()=>{ if (heroOpen()) document.getElementById('btn-hero-back').click(); });
 
 function startLoaded(slot){
   const sv = loadGame(G.account, slot);
   if (!sv){ return; }
   G.slot = slot;
   G.s = sv.state;
+  ensureDuo(G.s);   // salvataggi precedenti: il duo torna in testa al party
   show('world');
 }
 
@@ -91,6 +124,11 @@ export function initTitle(){
   // Invio nei campi: passa al PIN o accedi direttamente
   nameIn.addEventListener('keydown', e=>{ if (e.key === 'Enter') pinIn.focus(); });
   pinIn.addEventListener('keydown', e=>{ if (e.key === 'Enter') document.getElementById('btn-login').click(); });
+  document.getElementById('btn-hero-back').addEventListener('click', ()=>{
+    sfx('cancel');
+    heroBox.classList.add('hidden');
+    saveBox.classList.remove('hidden');
+  });
   document.getElementById('btn-logout').addEventListener('click', ()=>{
     sfx('cancel');
     G.account = null;
@@ -104,6 +142,7 @@ registerScreen('title', {
   el,
   enter(){
     playMusic('title');
+    heroBox.classList.add('hidden');
     if (G.account){
       authBox.classList.add('hidden');
       saveBox.classList.remove('hidden');

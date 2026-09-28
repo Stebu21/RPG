@@ -3,10 +3,10 @@
 
 import { MONSTERS } from '../data/monsters.js';
 import { QUESTS, registerKill } from '../data/quests.js';
-import { ABILITIES, STATUS_NAMES } from '../data/abilities.js';
+import { ABILITIES, STATUS_NAMES, COMBOS } from '../data/abilities.js';
 import { CHARACTERS } from '../data/characters.js';
 import { ITEMS } from '../data/items.js';
-import { G, statsOf, knownAbilities, gainExp, abilityName } from '../engine/state.js';
+import { G, statsOf, knownAbilities, gainExp, abilityName, DUO } from '../engine/state.js';
 import { drawMonster, drawActor, TILE } from '../engine/sprites.js';
 import { playMusic, stopMusic, sfx } from '../engine/audio.js';
 import { registerScreen, show, currentScreen } from '../engine/ui.js';
@@ -678,6 +678,11 @@ function showCommands(a){
   }
   mk('Attacca', ()=>chooseAbility(a, 'attacco'));
   mk('Abilità', ()=>showAbilityMenu(a));
+  if (DUO.includes(a.id)){
+    const mate = duoMate(a);
+    const why = !mate ? 'compagno KO' : mate.statuses.sonno ? 'compagno addormentato' : mate.atb < ATB_MAX/2 ? 'compagno in carica' : 'Ste + Riki';
+    mk('✦ Combo', ()=>showComboMenu(a), !comboReady(a), why).classList.add('combo-cmd');
+  }
   mk('Oggetti', ()=>showItemMenu(a));
   mk('Fuggi', ()=>tryFlee(a), B.boss);
   resetNav();
@@ -704,6 +709,88 @@ function showAbilityMenu(a){
   back.onclick = ()=>showCommands(a);
   cmdList.appendChild(back);
   resetNav();
+}
+
+// ---------- mosse combinate del duo ----------
+function duoMate(a){
+  const m = B.allies.find(x=>DUO.includes(x.id) && x !== a);
+  return m && m.cs.hp > 0 ? m : null;
+}
+// il compagno deve essere vivo, sveglio e con la barra ATB almeno a metà
+function comboReady(a){
+  const m = duoMate(a);
+  return !!m && !m.statuses.sonno && m.atb >= ATB_MAX / 2;
+}
+function comboUnlocked(c){ return Math.min(G.s.chars.ste.level, G.s.chars.riki.level) >= c.lv; }
+function comboAffordable(c){ return G.s.chars.ste.mp >= c.mp.ste && G.s.chars.riki.mp >= c.mp.riki; }
+
+function showComboMenu(a){
+  B.menuLevel = 'sub';
+  cmdTitle.textContent = 'Ste + Riki — combo';
+  cmdList.innerHTML = '';
+  for (const [id, c] of Object.entries(COMBOS)){
+    const b = document.createElement('button');
+    b.className = 'btn';
+    const open = comboUnlocked(c);
+    b.innerHTML = open ? `${c.name}<small>Ste ${c.mp.ste} · Riki ${c.mp.riki} MP</small>` : `???<small>Lv.${c.lv} del duo</small>`;
+    b.disabled = !open || !comboAffordable(c);
+    b.title = open ? c.desc : '';
+    b.onclick = ()=>chooseCombo(a, id);
+    cmdList.appendChild(b);
+  }
+  const back = document.createElement('button');
+  back.className = 'btn btn-dim btn-back-row';
+  back.textContent = '◀ Indietro';
+  back.onclick = ()=>showCommands(a);
+  cmdList.appendChild(back);
+  resetNav();
+}
+
+function chooseCombo(a, comboId){
+  const c = COMBOS[comboId];
+  hideCommands();
+  const go = targets=>{
+    const mate = duoMate(a);
+    B.readyQueue.shift();
+    B.readyQueue = B.readyQueue.filter(u=>u !== mate);   // anche il compagno spende il turno
+    a.atb = 0; mate.atb = 0;
+    B.animLock = true;
+    execCombo(a, mate, c, targets, ()=>{ B.animLock = false; processQueue(); });
+  };
+  if (c.target === 'enemy') needTarget('enemy', t=>go([t]));
+  else go(aliveEnemies());
+}
+
+function execCombo(a, mate, c, targets, done){
+  const ste = a.id === 'ste' ? a : mate, riki = a.id === 'riki' ? a : mate;
+  ste.cs.mp -= c.mp.ste; riki.cs.mp -= c.mp.riki;
+  tickStatusesOnAct(a);
+  sfx('limit'); flash('rgba(160,120,255,.45)');
+  log(`COMBO! Ste e Riki: ${c.name}!`);
+  animate(ste, 'cast');
+  for (const t of targets) fxForSpell(ste, t, c.element);
+  setTimeout(()=>{
+    if (targets.length === 1) animate(riki, 'dash', targets[0]); else animate(riki, 'lunge');
+  }, 250);
+  setTimeout(()=>{
+    sfx('hit'); flash('rgba(255,255,255,.35)');
+    for (const t of targets){
+      if (t.hp <= 0) continue;
+      let total = 0, anyCrit = false;
+      for (let h=0; h<(c.hits||1); h++){
+        // metà magia di Ste, metà lama di Riki: +20% per la sinergia
+        const m = computeDamage(ste, t, { type:'mag',  power:c.power*0.6, element:c.element });
+        const p = computeDamage(riki, t, { type:'phys', power:c.power*0.6, element:c.element, crit:c.crit });
+        total += m.dmg + p.dmg; anyCrit ||= p.crit;
+      }
+      applyDamage(t, total);
+      animate(t, 'hit');
+      spawnFx({ kind:'slash', x1:t.sx, y1:t.sy - t.size*0.5, dur:0.35, color: ELEM_FX[c.element] || '#fff' });
+      popDamage(t, total, anyCrit ? 'crit' : '');
+    }
+    updatePartyBars();
+    setTimeout(()=>checkOutcome(done), 520);
+  }, 700);
 }
 
 function showItemMenu(a){

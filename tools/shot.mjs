@@ -32,6 +32,8 @@ await page.screenshot({ path: 'tools/shot-title.png' });
 await page.click('#btn-register');
 await page.waitForSelector('#save-box:not(.hidden)');
 await page.click('#save-slots button');
+await page.waitForSelector('#hero-box:not(.hidden) .hero-card');
+await page.click('.hero-card[data-hero="ste"]');
 await page.waitForSelector('#screen-world:not(.hidden)');
 // chiudi intro
 for (let i = 0; i < 20; i++){

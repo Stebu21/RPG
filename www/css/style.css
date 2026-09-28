@@ -113,6 +113,12 @@ html, body {
 #auth-msg { min-height:18px; color:var(--text-dim); margin-bottom:4px; }
 #save-slots { display:flex; flex-direction:column; gap:8px; margin:8px 0; }
 .save-slot { text-align:left; font-size:13px; }
+#hero-choices { display:flex; gap:10px; margin:10px 0; }
+.hero-card { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 6px; }
+.hero-card canvas { width:84px; height:84px; border-radius:10px; }
+.hero-card b { font-size:16px; letter-spacing:1px; }
+#cmd-list .combo-cmd:not(:disabled) { background:linear-gradient(90deg, rgba(126,87,255,.45), rgba(231,76,60,.45)); }
+.hero-card small { font-size:11px; opacity:.8; line-height:1.35; }
 .save-slot small { color:var(--text-dim); display:block; }
 
 /* ---------- mondo ---------- */
