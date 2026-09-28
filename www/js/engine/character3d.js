@@ -369,7 +369,7 @@ export class Person {
     this.legs.forEach((l, i)=>{
       const s = i ? -1 : 1;
       const a = sw * s;
-      l.hip.rotation.x = -a * 0.55 * amt;
+      l.hip.rotation.x = -a * 0.55 * amt; l.hip.rotation.z = 0;
       l.knee.rotation.x = Math.max(0, Math.sin(ph + (i ? Math.PI : 0) + 1.2)) * 0.9 * amt;
     });
     this.arms.forEach((a, i)=>{
@@ -476,3 +476,58 @@ export function makeBike(){
   g.userData.wheels = wheels;
   return g;
 }
+
+// cavalcature: cavallo baio e asinello grigio. gait(fase, velocità) muove le zampe
+// (passo lento da fermi, galoppo in corsa) e fa ondeggiare collo e coda.
+function makeMount(o){
+  const g = new THREE.Group();
+  const coat = std(o.coat, { roughness:0.85 }), dark = std(o.mane, { roughness:0.9 }), hoofM = std(0x2a2420);
+  const k = o.scale;
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.14 * k, 0.46 * k, 6, 14), coat);
+  body.rotation.x = Math.PI / 2; body.position.set(0, 0.66 * k, 0); g.add(body);
+  // sella e coperta
+  const saddle = new THREE.Mesh(new THREE.CylinderGeometry(0.15 * k, 0.15 * k, 0.2 * k, 14, 1, false, -Math.PI / 2, Math.PI), std(o.saddle));
+  saddle.rotation.z = Math.PI / 2; saddle.rotation.y = Math.PI / 2; saddle.position.set(0, 0.72 * k, -0.02 * k); g.add(saddle);
+  const neck = new THREE.Group(); neck.position.set(0, 0.72 * k, 0.26 * k); g.add(neck);
+  const nk = new THREE.Mesh(new THREE.CapsuleGeometry(0.075 * k, 0.26 * k, 4, 10), coat);
+  nk.rotation.x = 0.7; nk.position.set(0, 0.12 * k, 0.08 * k); neck.add(nk);
+  const head = new THREE.Mesh(new THREE.CapsuleGeometry(0.07 * k, 0.2 * k, 4, 10), coat);
+  head.rotation.x = 1.9; head.position.set(0, 0.28 * k, 0.24 * k); neck.add(head);
+  for (const s of [-1, 1]){
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.025 * k, (o.ears || 0.08) * k, 6), coat);
+    ear.position.set(s * 0.04 * k, 0.36 * k + (o.ears || 0.08) * k * 0.4, 0.17 * k); ear.rotation.z = -s * 0.2; neck.add(ear);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.014 * k, 6, 6), std(0x111111));
+    eye.position.set(s * 0.06 * k, 0.31 * k, 0.26 * k); neck.add(eye);
+  }
+  const mane = new THREE.Mesh(new THREE.BoxGeometry(0.03 * k, 0.07 * k, 0.3 * k), dark);
+  mane.rotation.x = -0.85; mane.position.set(0, 0.2 * k, 0.03 * k); neck.add(mane);
+  const tail = new THREE.Group(); tail.position.set(0, 0.7 * k, -0.37 * k); g.add(tail);
+  const tl = new THREE.Mesh(new THREE.ConeGeometry(0.045 * k, 0.34 * k, 6), dark);
+  tl.position.set(0, -0.15 * k, -0.04 * k); tl.rotation.x = Math.PI - 0.35; tail.add(tl);
+  // zampe: anca, ginocchio, zoccolo
+  const legs = [];
+  for (const [x, z, ph] of [[-1, 1, 0], [1, 1, Math.PI], [-1, -1, Math.PI * 0.5], [1, -1, Math.PI * 1.5]]){
+    const hip = new THREE.Group(); hip.position.set(x * 0.08 * k, 0.6 * k, z * 0.24 * k); g.add(hip);
+    const up = new THREE.Mesh(new THREE.CapsuleGeometry(0.04 * k, 0.2 * k, 4, 8), coat); up.position.y = -0.13 * k; hip.add(up);
+    const knee = new THREE.Group(); knee.position.y = -0.27 * k; hip.add(knee);
+    const lo = new THREE.Mesh(new THREE.CapsuleGeometry(0.028 * k, 0.2 * k, 4, 8), coat); lo.position.y = -0.12 * k; knee.add(lo);
+    const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.032 * k, 0.038 * k, 0.05 * k, 8), hoofM); hoof.position.y = -0.26 * k; knee.add(hoof);
+    legs.push({ hip, knee, ph, front:z > 0 });
+  }
+  g.traverse(m=>{ if (m.isMesh) m.castShadow = true; });
+  g.userData.wheels = [];
+  g.userData.gait = (walk, speed)=>{
+    const amt = Math.min(1, speed / 3), t = walk * Math.PI * (speed > 6 ? 2.4 : 3);
+    for (const l of legs){
+      const a = Math.sin(t + l.ph);
+      l.hip.rotation.x = a * 0.55 * amt;
+      l.knee.rotation.x = (l.front ? -1 : 1) * Math.max(0, Math.sin(t + l.ph + 1.2)) * 0.8 * amt;
+    }
+    body.position.y = 0.66 * k + Math.abs(Math.sin(t)) * 0.03 * amt;
+    neck.rotation.x = Math.sin(t) * 0.12 * amt + (speed < 0.2 ? 0.35 + Math.sin(performance.now() / 900) * 0.1 : 0);   // fermo: bruca
+    tail.rotation.z = Math.sin(performance.now() / 400) * 0.25;
+  };
+  return g;
+}
+export const makeHorse = ()=>makeMount({ coat:0x7a4a2a, mane:0x1e140e, saddle:0x3a2416, scale:1.12 });
+export const makeDonkey = ()=>makeMount({ coat:0x8f8a84, mane:0x3b3632, saddle:0x6b3a2a, scale:0.88, ears:0.16 });

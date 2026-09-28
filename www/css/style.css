@@ -228,23 +228,20 @@ html, body {
   background:rgba(78,104,200,.7);
   box-shadow:0 6px 18px rgba(78,104,200,.4);
 }
-#btn-back:active { background:rgba(110,140,235,.95); }
-#btn-run, #btn-ride {
+#btn-back:active, #btn-back.on { background:rgba(110,140,235,.95); }
+#btn-ride {
   position:absolute; pointer-events:auto; width:48px; height:48px; border-radius:50%;
   font-size:20px; color:#fff; border:1px solid rgba(255,255,255,.3);
   background:rgba(40,160,120,.65); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
 }
-#btn-run { right:160px; bottom:max(24px, env(safe-area-inset-bottom)); }
 #btn-ride { right:22px; bottom:max(132px, calc(env(safe-area-inset-bottom) + 118px)); background:rgba(200,140,40,.7); }
-#btn-run.on { background:rgba(60,220,160,.95); }
 #btn-ride.hidden { display:none; }
 
 /* ---------- telefono e tablet: i testi non coprono mai i comandi ---------- */
 @media (pointer:coarse){
-  /* pulsantiera a destra: A grande in basso a destra, B a sinistra di A, corsa e mezzo sopra */
+  /* pulsantiera a destra: A grande in basso a destra, B (tienilo premuto per correre) a sinistra di A, mezzo sopra */
   #btn-action { right:16px; bottom:calc(max(16px, env(safe-area-inset-bottom)) + 44px); }
   #btn-back   { right:88px; bottom:max(14px, env(safe-area-inset-bottom)); }
-  #btn-run    { right:96px; bottom:calc(max(14px, env(safe-area-inset-bottom)) + 78px); }
   #btn-ride   { right:22px; bottom:calc(max(16px, env(safe-area-inset-bottom)) + 118px); }
   /* dialoghi sopra la pulsantiera; scelte (negozio, locanda) in alto */
   #dialog-box { bottom:calc(max(14px, env(safe-area-inset-bottom)) + 186px); }

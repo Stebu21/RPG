@@ -10,8 +10,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { Person, makeBike, makeScooter, makeVespa } from './character3d.js';
-const MAKE_VEHICLE = { bici:makeBike, monopattino:makeScooter, vespa:makeVespa };
+import { Person, makeBike, makeScooter, makeVespa, makeHorse, makeDonkey } from './character3d.js';
+const MAKE_VEHICLE = { bici:makeBike, monopattino:makeScooter, vespa:makeVespa, cavallo:makeHorse, asino:makeDonkey };
 
 // ---------- util ----------
 // Solo su telefoni/tablet (schermo touch o finestra stretta) la camera sta più lontana:
@@ -35,7 +35,29 @@ function smoothNoise(x, y, s){
 }
 function fbm(x, y, s=1){ return smoothNoise(x,y,s)*0.55 + smoothNoise(x*2.1,y*2.1,s+7)*0.3 + smoothNoise(x*4.3,y*4.3,s+13)*0.15; }
 const C = c=>new THREE.Color(c);
-const mat = (color, o={})=>new THREE.MeshStandardMaterial({ color, roughness:0.85, metalness:0, ...o });
+// "vedo attraverso": tutto ciò che sta tra la camera e il giocatore, in un cerchio attorno a lui
+// sullo schermo, si trafora a puntini (tetti e muri non lo nascondono più nelle vie strette)
+const XRAY = { xrC:{ value:new THREE.Vector2(-1e5, -1e5) }, xrR:{ value:0 }, xrP:{ value:new THREE.Vector2() }, xrF:{ value:new THREE.Vector2(0, -1) }, xrInv:{ value:new THREE.Matrix4() } };
+function seeThrough(m){
+  m.onBeforeCompile = sh=>{
+    Object.assign(sh.uniforms, XRAY);
+    sh.fragmentShader = 'uniform vec2 xrC;\nuniform float xrR;\nuniform vec2 xrP;\nuniform vec2 xrF;\nuniform mat4 xrInv;\n' + sh.fragmentShader.replace('void main() {', `void main() {
+      {
+        vec2 xd = gl_FragCoord.xy - xrC;
+        float xq = dot(xd, xd) / max(xrR * xrR, 1.0);
+        // solo ciò che sta tra la camera e il giocatore (in pianta) e sopra il suolo: il terreno
+        // e le case alle sue spalle restano intere
+        vec3 xw = (xrInv * vec4(-vViewPosition, 1.0)).xyz;
+        if (xq < 1.0 && xw.y > 0.3 && dot(xw.xz - xrP, xrF) < -0.15){
+          float n = fract(sin(dot(floor(gl_FragCoord.xy / 2.0), vec2(12.9898, 78.233))) * 43758.5453);
+          if (n < 0.92 - xq * 0.75) discard;
+        }
+      }`);
+  };
+  m.customProgramCacheKey = ()=>'xray';
+  return m;
+}
+const mat = (color, o={})=>seeThrough(new THREE.MeshStandardMaterial({ color, roughness:0.85, metalness:0, ...o }));
 
 function canvasTex(w, h, paint, repeat){
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -657,6 +679,7 @@ export class World3D {
       const bg = new THREE.ConeGeometry(0.035, 0.42, 3, 1, true); bg.translate(0, 0.21, 0);
       const bm = mat(0x7fc04e, { side:THREE.DoubleSide, emissive:0x1a3310 });
       const windU = { value:0 };
+      bm.customProgramCacheKey = ()=>'grass';
       bm.onBeforeCompile = sh=>{
         sh.uniforms.time = windU;
         sh.vertexShader = 'uniform float time;\n' + sh.vertexShader.replace('#include <begin_vertex>',
@@ -695,6 +718,7 @@ export class World3D {
 
     // --- edifici: componenti connesse di muri/porte/chiese ---
     const BUILD = new Set(['#','D','C','d']);
+    this.built = (x, y)=>BUILD.has(getCh(x, y));   // facciate addossate a un'altra casa: niente finestre
     for (let y=0; y<H; y++) for (let x=0; x<W; x++){
       if (!BUILD.has(getCh(x,y)) || visited.has(key(x,y))) continue;
       if (this.indoor) continue;
@@ -707,11 +731,32 @@ export class World3D {
         }
       }
       const xs = cells.map(c=>c[0]), ys = cells.map(c=>c[1]);
-      const bx0 = Math.min(...xs), bx1 = Math.max(...xs)+1, by0 = Math.min(...ys), by1 = Math.max(...ys)+1;
-      const doors = cells.filter(([cx,cy])=>getCh(cx,cy) === 'D' || getCh(cx,cy) === 'd');
+      const bx0 = Math.min(...xs), by0 = Math.min(...ys);
       const church = cells.some(([cx,cy])=>getCh(cx,cy) === 'C');
-      const lazzaretto = tris.some(t=>t.type === 'door_event' && t.event === 'lazzaretto' && t.x >= bx0 && t.x < bx1 && t.y >= by0 && t.y < by1);
-      this.building(g, bx0, by0, bx1, by1, doors, church, lazzaretto, plasterPal[(hash(bx0, by0, 80)*plasterPal.length)|0]);
+      const color = plasterPal[(hash(bx0, by0, 80)*plasterPal.length)|0];
+      // il blocco si divide in rettangoli pieni: i muri disegnati coincidono con le caselle
+      // che bloccano il passo (un solo box sul contorno coprirebbe anche strade e cortili)
+      const inComp = new Set(cells.map(([cx, cy])=>key(cx, cy))), taken = new Set();
+      cells.sort((a, b)=>a[1] - b[1] || a[0] - b[0]);
+      for (const [sx, sy] of cells){
+        if (taken.has(key(sx, sy))) continue;
+        let ex = sx; while (inComp.has(key(ex + 1, sy)) && !taken.has(key(ex + 1, sy))) ex++;
+        let ey = sy;
+        const rowFree = y=>{ for (let x = sx; x <= ex; x++) if (!inComp.has(key(x, y)) || taken.has(key(x, y))) return false; return true; };
+        while (rowFree(ey + 1)) ey++;
+        for (let y = sy; y <= ey; y++) for (let x = sx; x <= ex; x++) taken.add(key(x, y));
+        const x1 = ex + 1, y1 = ey + 1;
+        const doors = [];
+        for (let y = sy; y <= ey; y++) for (let x = sx; x <= ex; x++){
+          const ch = getCh(x, y);
+          if (ch !== 'D' && ch !== 'd') continue;
+          // la porta va sul lato da cui si entra davvero
+          const side = !BUILD.has(getCh(x, y + 1)) ? 's' : !BUILD.has(getCh(x - 1, y)) ? 'w' : !BUILD.has(getCh(x + 1, y)) ? 'e' : 'n';
+          doors.push([x, y, side]);
+        }
+        const lazzaretto = tris.some(t=>t.type === 'door_event' && t.event === 'lazzaretto' && t.x >= sx && t.x < x1 && t.y >= sy && t.y < y1);
+        this.building(g, sx, sy, x1, y1, doors, church && cells.some(([cx, cy])=>getCh(cx, cy) === 'C' && cx >= sx && cx < x1 && cy >= sy && cy < y1), lazzaretto, color);
+      }
     }
 
     // --- oggetti singoli ---
@@ -825,7 +870,7 @@ export class World3D {
     const winM = this.winMat;
 
     // porte
-    for (const [dx] of doors){
+    for (const [dx, dy, side = 's'] of doors){
       const door = new THREE.Group();
       addBox(door, 0.6, 1.0, 0.06, mat(0x5b3a22, { map:T.wood }), 0, 0.5, 0, false);
       const arch = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 16, 1, false, 0, Math.PI), mat(0x5b3a22, { map:T.wood }));
@@ -833,15 +878,19 @@ export class World3D {
       addBox(door, 0.8, 0.08, 0.3, mat(0x9a9286, { map:T.stone }), 0, 0.04, 0.12, false);   // gradino
       const knob = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 6), mat(0xd4af37, { metalness:1, roughness:0.3 }));
       knob.position.set(0.18, 0.5, 0.05); door.add(knob);
-      door.position.set(dx + 0.5, 0, south);
+      // sul lato giusto: sud (verso la camera), ovest, est o nord
+      const px = side === 'w' ? x0 + inset - 0.005 : side === 'e' ? x1 - inset + 0.005 : dx + 0.5;
+      const pz = side === 's' ? south : side === 'n' ? y0 + inset - 0.005 : dy + 0.5;
+      const rot = { s:0, n:Math.PI, w:-Math.PI/2, e:Math.PI/2 }[side || 's'];
+      door.position.set(px, 0, pz); door.rotation.y = rot;
       g.add(door);
       // lampada sopra la porta
       const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), this.lampMat);
-      lamp.position.set(dx + 0.5, 1.45, south + 0.08); g.add(lamp);
+      lamp.position.set(px + Math.sin(rot) * 0.08, 1.45, pz + Math.cos(rot) * 0.08); g.add(lamp);
     }
 
     // finestre con persiane su facciata e fianchi
-    const doorCols = new Set(doors.map(([dx])=>dx));
+    const doorCols = new Set(doors.filter(d=>(d[2] || 's') === 's').map(([dx])=>dx));
     const floors = wallH > 2.1 ? 2 : 1;
     const addWin = (px, py, pz, rotY)=>{
       const wg = new THREE.Group();
@@ -858,13 +907,13 @@ export class World3D {
       for (let f=0; f<floors; f++){
         const py = f === 0 ? 0.95 : 1.8;
         if (f === 0 && doorCols.has(c)) continue;
-        if (church) continue;
+        if (church || this.built?.(c, y1)) continue;
         addWin(c + 0.5, py, south + 0.01, 0);
       }
     }
     if (!church && d >= 2) for (let r = y0; r < y1; r++){
-      addWin(x0 + inset - 0.01, 1.0, r + 0.5, -Math.PI/2);
-      addWin(x1 - inset + 0.01, 1.0, r + 0.5, Math.PI/2);
+      if (!this.built?.(x0 - 1, r)) addWin(x0 + inset - 0.01, 1.0, r + 0.5, -Math.PI/2);
+      if (!this.built?.(x1, r)) addWin(x1 - inset + 0.01, 1.0, r + 0.5, Math.PI/2);
     }
 
     if (church){
@@ -1235,6 +1284,21 @@ export class World3D {
     return b;
   }
 
+  // posizione del giocatore sullo schermo (pixel del render) e distanza dalla camera
+  updateXray(focus){
+    if (window.__closeup){ XRAY.xrR.value = 0; return; }
+    this.camera.updateMatrixWorld();
+    const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    const px = p=>{ const v = p.clone().project(this.camera); return new THREE.Vector2((v.x + 1) / 2 * size.x, (v.y + 1) / 2 * size.y); };
+    const feet = new THREE.Vector3(focus.x, 0.1, focus.z), head = new THREE.Vector3(focus.x, 1.5, focus.z);
+    const a = px(feet), b = px(head);
+    XRAY.xrC.value.copy(a).add(b).multiplyScalar(0.5);
+    XRAY.xrR.value = Math.max(40, a.distanceTo(b) * 1.15);
+    XRAY.xrP.value.set(focus.x, focus.z);
+    XRAY.xrF.value.set(focus.x - this.camera.position.x, focus.z - this.camera.position.z).normalize();
+    XRAY.xrInv.value.copy(this.camera.matrixWorld);
+  }
+
   beginActors(){ for (const a of this.actors.values()) a.used = false; }
   endActors(){
     for (const [id, a] of this.actors) if (!a.used){ this.mapGroup.remove(a.mesh); a.dispose(); this.actors.delete(id); }
@@ -1294,6 +1358,7 @@ export class World3D {
     }
     this.camera.position.copy(this.camPos);
     this.camera.lookAt(this.camTarget);
+    this.updateXray(focus);
 
     // sole che segue la camera per ombre nitide vicino al giocatore
     if (!indoor){

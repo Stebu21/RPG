@@ -5,6 +5,7 @@ export const Input = {
   dirs: { up:false, down:false, left:false, right:false },
   actionQueued: false,
   enabled: true,
+  backHeld: false,       // B / Alt tenuto premuto: nel mondo si corre
 
   heldDir(){
     if (this.dirs.up) return 'up';
@@ -51,6 +52,7 @@ export function initInput(onAction, onMenu){
       onAction?.();
       e.preventDefault();
     } else if (e.key === 'Alt' || e.key === 'Escape'){
+      if (e.key === 'Alt'){ Input.backHeld = true; e.preventDefault(); }
       if (e.repeat) return;
       emit('pad-back');
       e.preventDefault();
@@ -64,7 +66,10 @@ export function initInput(onAction, onMenu){
   window.addEventListener('keyup', e=>{
     const d = KEYMAP[e.key];
     if (d) Input.dirs[d] = false;
+    if (e.key === 'Alt'){ Input.backHeld = false; e.preventDefault(); }   // niente barra menu del browser
   });
+  // Alt+Tab o cambio finestra: nessun tasto resta "incastrato"
+  window.addEventListener('blur', ()=>{ Input.backHeld = false; for (const k in Input.dirs) Input.dirs[k] = false; });
 
   for (const btn of document.querySelectorAll('.dpad-btn')){
     const dir = btn.dataset.dir;
@@ -84,7 +89,10 @@ export function initInput(onAction, onMenu){
 
   // pulsante B = indietro (come il tasto B del Game Boy)
   const back = document.getElementById('btn-back');
-  const fireBack = e=>{ e.preventDefault(); emit('pad-back'); };
+  // tenerlo premuto fa correre (con le Scarpe da Corsa)
+  const fireBack = e=>{ e.preventDefault(); Input.backHeld = true; back.classList.add('on'); emit('pad-back'); };
+  const releaseBack = e=>{ e.preventDefault(); Input.backHeld = false; back.classList.remove('on'); };
   back.addEventListener('touchstart', fireBack, {passive:false});
   back.addEventListener('mousedown', fireBack);
+  for (const ev of ['touchend', 'touchcancel', 'mouseup', 'mouseleave']) back.addEventListener(ev, releaseBack, {passive:false});
 }

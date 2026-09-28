@@ -383,6 +383,7 @@ const INTERNI = {
     ],
     exit:[[4,6],[5,6]],
     npcs:[{ x:7, y:3, npc:'abitante' }],
+    chest:[6,2],
   },
   negozio: {
     tiles:[
@@ -410,6 +411,38 @@ const INTERNI = {
     ],
     exit:[[5,7],[6,7]],
     npcs:[{ x:6, y:1, npc:'oste', sprite:'#b06a4a' }],
+  },
+  // interni generati per le case dei paesi OSM
+  appartamento: {
+    tiles:[
+      'MMMMMMMMMMMM',
+      'MZZwwwMllwwM',
+      'MwwwwwMllwwM',
+      'MwOOwwwwwwwM',
+      'MwOOwwMwwZZM',
+      'MwwwwwMwwwwM',
+      'MwwwwRRwwwwM',
+      'MMMMMwwMMMMM',
+    ],
+    exit:[[5,7],[6,7]],
+    npcs:[{ x:8, y:5 }],
+    chest:[4,1],
+  },
+  capannone: {
+    tiles:[
+      'MMMMMMMMMMMMMM',
+      'MKKKwwwwwwKKKM',
+      'MwwwwwwwwwwwwM',
+      'MwwOOwwwwOOwwM',
+      'MwwOOwwwwOOwwM',
+      'MwwwwwwwwwwwwM',
+      'MZZwwwwwwwwZZM',
+      'MwwwwwRRwwwwwM',
+      'MMMMMMwwMMMMMM',
+    ],
+    exit:[[6,8],[7,8]],
+    npcs:[{ x:7, y:2 }],
+    chest:[5,2],
   },
   chiesa: {
     tiles:[
@@ -487,6 +520,63 @@ MAPS.chiesa_samarate  = chiesaDi('Chiesa della SS. Trinità', { map:'samarate', 
 // ---------- paesi reali da OpenStreetMap ----------
 // Le mappe generate da tools/osm-town.mjs sostituiscono quelle disegnate a
 // mano; porte, personaggi e oggetti vengono agganciati agli edifici veri.
+// Case visitabili: dietro ogni porta dei paesi OSM c'è un interno. Tipo, abitante ed
+// eventuale forziere dipendono dalla posizione, così la stessa porta porta sempre allo stesso posto.
+const RESIDENTI = 10;
+const LOOT = ['pozione', 'pozione', 'etere', 'antidoto'];
+function houses(town, tiles, streets, list){
+  const at = (x, y)=>tiles[y]?.[x] ?? ' ';
+  const has = new Set(list.map(t=>t.x + ',' + t.y));
+  const BUILDING = '#DCW';
+  const walk = c=>'.,F=:B'.includes(c);
+  const seed = (x, y, k)=>(((x * 73856093) ^ (y * 19349663) ^ (k * 83492791)) >>> 0) % 1000 / 1000;
+  // dimensione del blocco di case (per scegliere casa, condominio o capannone)
+  const size = new Map();
+  const blockSize = (x0, y0)=>{
+    const k0 = x0 + ',' + y0;
+    if (size.has(k0)) return size.get(k0);
+    const seen = new Set([k0]), st = [[x0, y0]];
+    while (st.length){
+      const [x, y] = st.pop();
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+        const k = (x + dx) + ',' + (y + dy);
+        if (!seen.has(k) && BUILDING.includes(at(x + dx, y + dy))){ seen.add(k); st.push([x + dx, y + dy]); }
+      }
+    }
+    for (const k of seen) size.set(k, seen.size);
+    return seen.size;
+  };
+  // via più vicina (per il nome della casa)
+  const streetNear = (x, y)=>{
+    let best = null, bd = 64;
+    for (const st of streets || []) for (const line of st.lines) for (let i = 1; i < line.length; i++){
+      const [ax, ay] = line[i - 1], [bx, by] = line[i];
+      const vx = bx - ax, vy = by - ay, l2 = vx*vx + vy*vy || 1;
+      const u = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / l2));
+      const d = (ax + u*vx - x) ** 2 + (ay + u*vy - y) ** 2;
+      if (d < bd){ bd = d; best = st.name; }
+    }
+    return best;
+  };
+  for (let y = 0; y < tiles.length; y++) for (let x = 0; x < tiles[y].length; x++){
+    if (at(x, y) !== 'D' || has.has(x + ',' + y)) continue;
+    const front = [[0, 1], [-1, 0], [1, 0], [0, -1]].map(([dx, dy])=>[x + dx, y + dy]).find(([fx, fy])=>walk(at(fx, fy)));
+    if (!front){ tiles[y] = tiles[y].slice(0, x) + '#' + tiles[y].slice(x + 1); continue; }   // porta murata: non ci si arriva
+    const n = blockSize(x, y);
+    const kind = n > 60 && (town === 'samarate' || town === 'jerago') ? 'capannone' : n > 12 ? 'appartamento' : 'casa';
+    const via = streetNear(x, y);
+    const label = { casa:'Casa', appartamento:'Condominio', capannone:'Capannone' }[kind];
+    const T = INTERNI[kind], mid = `${town}_int_${x}_${y}`;
+    const [ex, ey] = T.exit[0];
+    const triggers = T.exit.map(([tx, ty])=>({ x:tx, y:ty, type:'portal', to:{ map:town, x:front[0], y:front[1] } }));
+    if (seed(x, y, 1) < 0.75) for (const p of T.npcs)
+      triggers.push({ x:p.x, y:p.y, type:'npc', npc:'residente' + Math.floor(seed(x, y, 2) * RESIDENTI), sprite:['#b08968','#8a7a66','#c97a5a','#6a8fb5','#b56a8f','#9b8a6a'][Math.floor(seed(x, y, 3) * 6)] });
+    if (seed(x, y, 4) < 0.15) triggers.push({ x:T.chest[0], y:T.chest[1], type:'chest', id:mid, item:LOOT[Math.floor(seed(x, y, 5) * LOOT.length)], qty:1 });
+    MAPS[mid] = { name: via ? `${label} in ${via}` : label, music:'town', town:true, indoor:true, tiles:T.tiles, triggers };
+    list.push({ x, y, type:'portal', to:{ map:mid, x:ex, y:ey - 1 } });
+  }
+}
+
 function osmTown(id, name, worldAt, place){
   if (!OSM_TOWNS[id]) return;
   const t = OSM_TOWNS[id], P = t.poi, list = [];
@@ -500,7 +590,9 @@ function osmTown(id, name, worldAt, place){
   };
   for (const [x, y] of P.entry.portals) list.push({ x, y, type:'portal', to:{ map:'world', ...worldAt } });
   place(H);
-  MAPS[id] = { name, music:'town', town:true, tiles:t.tiles, streets:t.streets, triggers:list, osm:true,
+  const tiles = t.tiles.map(r=>r.replace(/d/g, 'D'));   // ogni porta si apre
+  houses(id, tiles, t.streets, list);
+  MAPS[id] = { name, music:'town', town:true, tiles, streets:t.streets, triggers:list, osm:true,
                spawn:{ x:P.entry.spawn[0], y:P.entry.spawn[1] } };
   // la mappa del mondo porta all'ingresso vero del paese
   const wp = MAPS.world.triggers.find(tr=>tr.type === 'portal' && tr.to.map === id);
@@ -556,6 +648,7 @@ osmTown('castiglione', 'Castiglione Olona', { x:31, y:25 }, H=>{
   H.at('piazza', 1, { type:'npc', npc:'castiglione_pittore', sprite:'#7a9ab5' });
   H.at('piazza', 2, { type:'npc', npc:'castiglione_dama', sprite:'#c98ab5' });
   H.at('locanda', 0, { type:'vehicle', vehicle:'monopattino' });
+  H.at('collegiata', 2, { type:'vehicle', vehicle:'asino' });    // l'asinello del borgo
 });
 
 osmTown('jerago', 'Jerago con Orago', { x:19, y:31 }, H=>{
@@ -569,6 +662,7 @@ osmTown('jerago', 'Jerago con Orago', { x:19, y:31 }, H=>{
   H.door('chiesa', { map:'chiesa_jerago', x:4, y:7 });
   H.event('castello', 'castello');
   H.at('castello', 0, { type:'npc', npc:'jerago_castellano', sprite:'#9aa7b8' });
+  H.at('castello', 1, { type:'vehicle', vehicle:'cavallo' });     // il cavallo della scuderia del castello
   H.at('chiesa', 0, { type:'quest', quest:'jerago_cinghiali', sprite:'#b08968' });
   H.at('locanda', 0, { type:'npc', npc:'jerago_bambino', sprite:'#d9a05a' });
   H.at('negozio', 0, { type:'npc', npc:'jerago_contadina', sprite:'#a07a5a' });

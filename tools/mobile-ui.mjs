@@ -21,7 +21,7 @@ page.on('pageerror', e=>errors.push(e.message));
 const wait = ms=>new Promise(r=>setTimeout(r, ms));
 const rect = sel=>page.$eval(sel, e=>{ const r = e.getBoundingClientRect(); return { l:r.left, t:r.top, r:r.right, b:r.bottom, vis:r.width > 0 && getComputedStyle(e).display !== 'none' }; });
 const overlap = (a, b)=>a.vis && b.vis && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
-const CONTROLS = ['#dpad', '#btn-action', '#btn-back', '#btn-run'];
+const CONTROLS = ['#dpad', '#btn-action', '#btn-back'];
 const checkToast = async tag=>{ const t = await rect('#autosave-toast'); for (const c of CONTROLS) assert.ok(!overlap(t, await rect(c)), `${tag}: l'avviso di salvataggio copre ${c}`); };
 
 for (const [w, h, tag] of [[390, 780, 'port'], [800, 380, 'land']]){

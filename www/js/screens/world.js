@@ -49,13 +49,22 @@ let follower = { x:0, z:0, walk:0, face:0, speed:0, idle:0 };
 function resetFollower(x, z){
   trail = [{ x, z }];
   // parte al tuo fianco, così si vede subito
-  follower = { x: x + 0.75, z, walk:0, face:0, speed:0, idle:0 };
+  follower = { x, z, walk:0, face:0, speed:0, idle:0 };   // si affianca appena c'è posto
 }
+// il cerchio (cx, cz, r) sta tutto su caselle calpestabili?
+function freeCircle(cx, cz, r){
+  for (let ty = Math.floor(cz - r); ty <= Math.floor(cz + r); ty++) for (let tx = Math.floor(cx - r); tx <= Math.floor(cx + r); tx++){
+    if (walkable(tx, ty)) continue;
+    const nx = Math.max(tx, Math.min(cx, tx + 1)), nz = Math.max(ty, Math.min(cz, ty + 1));
+    if ((cx - nx) ** 2 + (cz - nz) ** 2 < r * r) return false;
+  }
+  return true;
+}
+const MATE_R = 0.26;              // ingombro del compagno
 function sideSpot(){
-  // da fermi si affianca al giocatore (a destra o a sinistra, dove c'è posto)
+  // da fermi si affianca al giocatore (a destra o a sinistra, dove c'è posto per tutto il corpo)
   for (const sx of [0.75, -0.75]){
-    const tx = Math.floor(player.px + sx), ty = Math.floor(player.pz);
-    if (walkable(tx, ty)) return { x: player.px + sx, z: player.pz };
+    if (freeCircle(player.px + sx, player.pz, MATE_R) && freeCircle(player.px + sx / 2, player.pz, MATE_R)) return { x: player.px + sx, z: player.pz };
   }
   return null;
 }
@@ -86,7 +95,10 @@ function updateFollower(dt){
   const maxStep = Math.max(4, Math.hypot(player.vx, player.vz) * 1.4) * dt;
   const step = Math.min(d, maxStep);
   if (d > 0.01){
-    follower.x += dx / d * step; follower.z += dz / d * step;
+    const nx = follower.x + dx / d * step, nz = follower.z + dz / d * step;
+    // mai dentro un muro: se la linea retta taglia uno spigolo, salta sul bersaglio (che è libero)
+    if (freeCircle(nx, nz, MATE_R)){ follower.x = nx; follower.z = nz; }
+    else if (freeCircle(target.x, target.z, MATE_R)){ follower.x = target.x; follower.z = target.z; }
     follower.face = Math.atan2(dx, dz); follower.walk += step * 1.6;
   } else if (follower.idle > 0.5){
     follower.face = Math.atan2(player.px - follower.x, player.pz - follower.z) * 0.5;   // si gira verso di te e la camera
@@ -143,8 +155,18 @@ function activeTriggers(){
   });
 }
 
+// indice per casella: i paesi OSM hanno migliaia di porte e il controllo delle collisioni
+// chiede i trigger decine di volte per fotogramma
+function triggerIndex(){
+  const list = map.triggers || [];
+  if (map._tix && map._tixN === list.length) return map._tix;
+  const ix = new Map();
+  for (const t of list){ const k = t.x + ',' + t.y; if (!ix.has(k)) ix.set(k, []); ix.get(k).push(t); }
+  map._tix = ix; map._tixN = list.length;
+  return ix;
+}
 function triggerAt(x, y){
-  return activeTriggers().find(t=>t.x===x && t.y===y) || null;
+  return triggerIndex().get(x + ',' + y)?.find(t=>!(t.hideFlag && G.s.flags[t.hideFlag])) || null;
 }
 
 function walkable(x, y){
@@ -372,7 +394,9 @@ function fireActionTrigger(t){
       addItem(t.vehicle, 1);
       G.s.vehicle = t.vehicle;
       sfx('levelup');
-      showDialog([['', `Hai trovato: ${VEHICLES[t.vehicle].name}! Ci sali subito. Premi V (o il tasto 🚲) per scendere o cambiare mezzo.`]]);
+      showDialog([['', VEHICLES[t.vehicle].mount
+        ? `${VEHICLES[t.vehicle].name} ti annusa la mano e si lascia accarezzare: ora è tuo! Ci sali in groppa. Premi V (o il tasto 🚲) per scendere o cambiare cavalcatura.`
+        : `Hai trovato: ${VEHICLES[t.vehicle].name}! Ci sali subito. Premi V (o il tasto 🚲) per scendere o cambiare mezzo.`]]);
       return;
     }
     case 'chest': {
@@ -513,14 +537,16 @@ function tryEncounter(){
 // si piega in curva e si rimbalza contro gli ostacoli.
 const PHYS = {
   walk: { max:3.4, accel:28, fric:16 },
-  run:  { max:5.6, accel:30, fric:14 },        // Shift o 🏃: sempre disponibile
-  sprint:{ max:6.8, accel:32, fric:14 },       // con le Scarpe da Corsa
+  run:  { max:6.4, accel:32, fric:14 },        // con le Scarpe da Corsa: tieni premuto Alt / B (o Shift)
 };
 // mezzi: la bici va di inerzia, il monopattino scatta e curva stretto, la Vespa è la più veloce
 export const VEHICLES = {
   bici:        { name:'Bicicletta', max:9.0,  accel:9,  fric:1.8, turn:5, seat:0.28, pedal:true },
   monopattino: { name:'Monopattino Elettrico', max:7.5, accel:15, fric:3.0, turn:8, seat:0.12, stand:true },
   vespa:       { name:'Vespa', max:12.5, accel:7, fric:1.1, turn:3.8, seat:0.36 },
+  // cavalcature: partono subito, curvano bene e al galoppo sono veloci quasi come la Vespa
+  cavallo:     { name:'Cavallo', max:11,  accel:11, fric:3.5, turn:6, seat:0.56, mount:true },
+  asino:       { name:'Asinello', max:6.8, accel:12, fric:5,   turn:7, seat:0.4,  mount:true },
 };
 const RADIUS = 0.3;       // raggio di collisione del giocatore (caselle)
 let running = false;
@@ -531,15 +557,10 @@ window.addEventListener('keydown', e=>{
   if ((e.key === 'v' || e.key === 'V') && currentScreen() === 'world' && !e.repeat) toggleRide();
 });
 window.addEventListener('keyup',   e=>{ if (e.key === 'Shift') running = false; });
-// pulsanti touch: corsa (tieni premuto) e sali/scendi dal mezzo
-{
-  const run = document.getElementById('btn-run');
-  const on = e=>{ e.preventDefault(); running = true; run.classList.add('on'); };
-  const off = e=>{ e.preventDefault(); running = false; run.classList.remove('on'); };
-  run.addEventListener('touchstart', on, { passive:false }); run.addEventListener('touchend', off, { passive:false });
-  run.addEventListener('mousedown', on); run.addEventListener('mouseup', off); run.addEventListener('mouseleave', off);
-  document.getElementById('btn-ride').addEventListener('click', ()=>toggleRide());
-}
+window.addEventListener('blur', ()=>{ running = false; });
+// la corsa: B / Alt tenuto premuto (come nei Pokémon) oppure Shift
+const runHeld = ()=>running || Input.backHeld;
+document.getElementById('btn-ride').addEventListener('click', ()=>toggleRide());
 
 // mezzo in uso (solo all'aperto e se lo si possiede)
 const riding = ()=>{
@@ -619,7 +640,7 @@ function update(dt){
   }
   if (busy){ player.vx = player.vz = 0; return; }
   const bike = onBike();
-  const P = bike ? VEHICLES[riding()] : running ? (G.s.items.scarpe > 0 ? PHYS.sprint : PHYS.run) : PHYS.walk;
+  const P = bike ? VEHICLES[riding()] : runHeld() && G.s.items.scarpe > 0 ? PHYS.run : PHYS.walk;
   const ax = Input.axis();
   let ix = ax.x, iz = ax.y;
   const len = Math.hypot(ix, iz);
@@ -728,7 +749,9 @@ function render(dt){
     if (t.type === 'vehicle'){
       if (G.s.items[t.vehicle] > 0) continue;              // già preso: lo porti con te
       const v = W3.vehicle('veh:' + t.x + ',' + t.y, t.vehicle);
-      v.mesh.position.set(t.x + 0.5, 0, t.y + 0.5); v.mesh.rotation.set(0, 0.6, -0.12);   // appoggiato sul cavalletto
+      v.mesh.position.set(t.x + 0.5, 0, t.y + 0.5);
+      if (VEHICLES[t.vehicle].mount){ v.mesh.rotation.set(0, 0.6 + Math.sin(performance.now() / 2400) * 0.3, 0); v.mesh.userData.gait?.(0, 0); }   // aspetta brucando
+      else v.mesh.rotation.set(0, 0.6, -0.12);   // appoggiato sul cavalletto
       continue;
     }
     if (t.type !== 'npc' && t.type !== 'quest') continue;
@@ -766,7 +789,11 @@ function render(dt){
     b.mesh.position.set(player.px, player.hop, player.pz);
     b.mesh.rotation.set(0, me.angle, player.lean);
     for (const w of b.mesh.userData.wheels) w.rotation.x += sp * dt / (b.mesh.userData.wheelR || 0.17);
-    if (V.pedal){        // in sella: gambe sui pedali che girano
+    b.mesh.userData.gait?.(player.walk, sp);
+    if (V.mount){        // in groppa: gambe ai fianchi, mani alle redini
+      me.legs.forEach((l, i)=>{ l.hip.rotation.x = -1.25; l.hip.rotation.z = i ? -0.35 : 0.35; l.knee.rotation.x = 1.1; });
+      me.arms.forEach(a=>{ a.sh.rotation.x = -0.7; a.el.rotation.x = -0.6; });
+    } else if (V.pedal){        // in sella: gambe sui pedali che girano
       me.legs.forEach((l, i)=>{ const a = player.walk * Math.PI * 4 + i * Math.PI; l.hip.rotation.x = -1.1 + Math.sin(a) * 0.35; l.knee.rotation.x = 1.3 + Math.cos(a) * 0.3; });
       me.arms.forEach(a=>{ a.sh.rotation.x = -0.9; a.el.rotation.x = -0.3; });
     } else if (V.stand){ // in piedi sulla pedana
@@ -845,3 +872,5 @@ export function initWorld(){
 }
 
 export { onAction as worldAction };
+// per i test: posizione continua del giocatore e caselle calpestabili
+export const debugWorld = { player:()=>player, follower:()=>follower, walkable:(x, y)=>walkable(x, y), map:()=>map };

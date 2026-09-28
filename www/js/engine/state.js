@@ -85,6 +85,7 @@ export function ensureDuo(s){
 // porta i salvataggi vecchi al formato attuale (caratteristiche, equipaggiamento)
 export function migrate(s){
   s.gear ||= {};
+  s.items.scarpe ||= 1;                                                     // corsa con B: anche per le partite vecchie
   if (s.flags?.bici_on){ s.vehicle = 'bici'; delete s.flags.bici_on; }   // vecchio interruttore della bici
   for (const cs of Object.values(s.chars)){
     if (!cs.attr){ cs.attr = {}; cs.pts = POINTS_PER_LEVEL * (cs.level - 1); }
@@ -116,7 +117,7 @@ function newGameState(hero){
     chests: {},
     quests: {},
     gold: 350,
-    items: { pozione: 8, etere: 3, antidoto: 2, coda_fenice: 1 },
+    items: { pozione: 8, etere: 3, antidoto: 2, coda_fenice: 1, scarpe: 1 },   // le Scarpe da Corsa si hanno da subito
     steps: 0,
     playMin: 0,
   };

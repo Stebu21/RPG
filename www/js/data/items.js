@@ -12,9 +12,11 @@ export const ITEMS = {
   vernice:      { name:'Vernice Speciale', desc:'Barattolo di vernice per il Colosso del parco di Vedano.', price:0, type:'quest' },
   reliquia:     { name:'Reliquia del Cardinale', desc:'Piccola teca dorata sparita dalla Collegiata.', price:0, type:'quest' },
   // oggetti chiave
-  scarpe:       { name:'Scarpe da Corsa', desc:'Corri ancora più veloce (Shift o il tasto 🏃). Sempre attive.', price:300, type:'key' },
+  scarpe:       { name:'Scarpe da Corsa', desc:'Tieni premuto B (Alt o Shift sulla tastiera) mentre cammini per correre.', price:300, type:'key' },
   bici:         { name:'Bicicletta', desc:'Premi V (o il tasto 🚲) per salire o scendere. Non negli interni.', price:800, type:'key', vehicle:true },
   monopattino:  { name:'Monopattino Elettrico', desc:'Scatta subito e curva stretto. Premi V per salire o scendere.', price:600, type:'key', vehicle:true },
+  cavallo:      { name:'Cavallo', desc:'Veloce e agile, al galoppo quasi come la Vespa. Premi V per salire o scendere.', price:3000, type:'key', vehicle:true },
+  asino:        { name:'Asinello', desc:'Lento ma testardo e simpatico. Premi V per salire o scendere.', price:900, type:'key', vehicle:true },
   vespa:        { name:'Vespa', desc:'La più veloce: prende velocità piano e va di inerzia. Premi V per salire o scendere.', price:2500, type:'key', vehicle:true },
 };
 
@@ -22,7 +24,7 @@ export const ITEMS = {
 // nella storia (Vedano -> Castiglione -> Jerago -> Samarate) più la merce è forte.
 export const SHOPS = {
   varese: {
-    oggetti:['pozione','etere','antidoto','campana','scarpe'],
+    oggetti:['pozione','etere','antidoto','campana'],
     armi:['bastone_betulla','katana_acciaio','revolver','bende_monaco','aspersorio','arco_frassino','ascia_cavatore','flauto_osso'],
     abiti:['tunica_allievo','gi_rinforzato','corazza_cuoio','anello_forza','amuleto_saggio'],
     magie:['tomo_fiamma','rotolo_iaijutsu'],
