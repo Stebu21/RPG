@@ -1397,6 +1397,35 @@ export class World3D {
     for (const [id, a] of this.actors) if (!a.used){ this.mapGroup.remove(a.mesh); a.dispose(); this.actors.delete(id); }
   }
 
+  // palina dell'autobus: palo, cartello blu con la scritta BUS, pensilina con panca
+  busStop(id, x, y){
+    let b = this.actors.get(id);
+    if (!b){
+      const grp = new THREE.Group();
+      const steel = mat(0x8a9099, { metalness:0.6, roughness:0.4 });
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 8), steel); pole.position.set(-0.3, 0.75, -0.25); grp.add(pole);
+      const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+      const g = c.getContext('2d');
+      g.fillStyle = '#1f4fa8'; g.fillRect(0, 0, 64, 64); g.strokeStyle = '#fff'; g.lineWidth = 4; g.strokeRect(4, 4, 56, 56);
+      g.fillStyle = '#ffd23f'; g.font = 'bold 24px sans-serif'; g.textAlign = 'center'; g.fillText('BUS', 32, 42);
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.03), [steel, steel, steel, steel, new THREE.MeshStandardMaterial({ map:tex }), new THREE.MeshStandardMaterial({ map:tex })]);
+      sign.position.set(-0.3, 1.45, -0.25); grp.add(sign);
+      // pensilina
+      const glass = new THREE.MeshStandardMaterial({ color:0xbfdcf0, transparent:true, opacity:0.35, roughness:0.1 });
+      addBox(grp, 0.8, 0.04, 0.4, steel, 0.1, 1.12, -0.3);
+      addBox(grp, 0.8, 1.05, 0.02, glass, 0.1, 0.58, -0.48, false);
+      for (const sx of [-0.28, 0.48]) addBox(grp, 0.03, 1.12, 0.03, steel, sx, 0.56, -0.47);
+      addBox(grp, 0.6, 0.05, 0.18, mat(0x7a5433, { map:textures().wood }), 0.1, 0.34, -0.38);
+      grp.position.set(x + 0.5, 0, y + 0.5);
+      this.mapGroup.add(grp);
+      b = { mesh:grp, dispose(){ tex.dispose(); } };
+      this.actors.set(id, b);
+    }
+    b.used = true;
+    return b;
+  }
+
   chest(id, x, y, opened){
     const key = 'chest:' + id;
     let c = this.actors.get(key);

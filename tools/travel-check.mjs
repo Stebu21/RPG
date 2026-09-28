@@ -90,6 +90,30 @@ await page.screenshot({ path:'tools/z-arrivo.png' });
 // un paese mai visitato non si raggiunge
 assert.equal(await ev(async ()=>(await import('./js/screens/world.js')).fastTravel('samarate')), false);
 
+// 4) fermate dell'autobus: dall'ingresso di Vedano al Lazzaretto in un attimo
+const stops = await ev(async ()=>(await import('./js/data/maps.js')).MAPS.vedano.triggers.filter(t=>t.type === 'stop'));
+console.log('fermate a Vedano:', stops.map(s=>s.name).join(' | '));
+assert.ok(stops.length >= 6, 'poche fermate');
+const from = stops.find(s=>s.name === 'Ingresso del paese'), to = stops.find(s=>s.name === 'Chiesa del Lazzaretto');
+// ci si mette accanto alla palina e ci si gira verso di lei
+const side = await ev(async (sx, sy)=>{ const { debugWorld } = await import('./js/screens/world.js');
+  return [[0, 1, 'ArrowUp'], [-1, 0, 'ArrowRight'], [1, 0, 'ArrowLeft'], [0, -1, 'ArrowDown']].find(([dx, dy])=>debugWorld.walkable(sx + dx, sy + dy)); }, from.x, from.y);
+await go('vedano', from.x + side[0], from.y + side[1]); await wait(500); await skip();
+await page.keyboard.down(side[2]); await wait(60); await page.keyboard.up(side[2]); await wait(200);
+await ev(async ()=>{ const { worldAction } = await import('./js/screens/world.js'); worldAction(); });
+await page.waitForSelector('#choice-box:not(.hidden)');
+await wait(300); await page.screenshot({ path:'tools/z-fermata.png' });
+const choices = await page.$$eval('#choice-box button', b=>b.map(x=>x.textContent));
+assert.ok(choices.includes('Chiesa del Lazzaretto') && !choices.includes('Ingresso del paese'), 'destinazioni sbagliate');
+await page.evaluate(()=>[...document.querySelectorAll('#choice-box button')].find(b=>b.textContent === 'Chiesa del Lazzaretto').click());
+await wait(800);
+st = await state();
+const far = Math.hypot(st.x - to.x, st.y - to.y);
+console.log('scesi a', st.x, st.y, '— distanza dalla fermata del Lazzaretto', far.toFixed(1));
+assert.ok(st.map === 'vedano' && far < 3, 'l\'autobus non porta alla fermata scelta');
+assert.ok(await page.$('#dialog-box.hidden') && await page.$('#choice-box.hidden'), 'finestre rimaste aperte');
+await page.screenshot({ path:'tools/z-lazzaretto.png' });
+
 assert.deepEqual(errors, []);
 console.log('TRAVEL OK');
 await browser.close(); server.close();

@@ -173,7 +173,7 @@ function walkable(x, y){
   const ch = tileAt(x, y);
   if (BLOCKED.has(ch)) return false;
   const t = triggerAt(x, y);
-  if (t && (t.type === 'npc' || t.type === 'quest')) return false;
+  if (t && (t.type === 'npc' || t.type === 'quest' || t.type === 'stop')) return false;
   return true;
 }
 
@@ -389,6 +389,20 @@ function fireActionTrigger(t){
       showDialog(v.lines.map(l=>[v.name, l]));
       return;
     }
+    case 'stop': {
+      // autobus: scegli un'altra fermata del paese e ci sei
+      const others = map.triggers.filter(s=>s.type === 'stop' && s !== t);
+      shopHeader(`🚌 Fermata «${t.name}»`, 'Dove vuoi andare?');
+      showChoice([
+        ...others.map(s=>({ label:s.name, cb:()=>{
+          dlgBox.classList.add('hidden');
+          sfx('confirm');
+          loadMap(G.s.map, s.x, s.y + 1);     // si scende accanto alla fermata (fixSpawn trova la casella libera)
+        } })),
+        { label:'Resto qui', cb:()=>dlgBox.classList.add('hidden') },
+      ]);
+      return;
+    }
     case 'vehicle': {
       if (G.s.items[t.vehicle] > 0) return;
       addItem(t.vehicle, 1);
@@ -506,6 +520,7 @@ export function loadMap(name, x, y){
   G.s.x = x; G.s.y = y;
   player = newPlayer(x, y);
   fixSpawn();
+  snapCam = true;                        // teletrasporto (autobus, viaggio rapido): la camera salta, non scivola
   hudLoc.textContent = map.name;
   playMusic(map.music || 'world');
   checkEnterEvents();
@@ -768,6 +783,7 @@ function onAction(){
 
 // ---------- rendering (three.js) ----------
 let hudT = 0;
+let snapCam = false;
 function render(dt){
   if (builtMap !== map){
     W3.build(map, G.s.map, map.triggers);
@@ -782,6 +798,7 @@ function render(dt){
   for (const t of map.triggers || []){
     if (t.type === 'portal' || (t.hideFlag && G.s.flags[t.hideFlag])) continue;
     if (t.type === 'chest'){ W3.chest(t.id, t.x, t.y, !!G.s.chests[t.id]); continue; }
+    if (t.type === 'stop'){ W3.busStop('stop:' + t.x + ',' + t.y, t.x, t.y); continue; }
     if (t.type === 'vehicle'){
       if (G.s.items[t.vehicle] > 0) continue;              // già preso: lo porti con te
       const v = W3.vehicle('veh:' + t.x + ',' + t.y, t.vehicle);
@@ -855,6 +872,7 @@ function render(dt){
 
   W3.endActors();
   W3.render(dt, { x:player.px, z:player.pz }, {
+    snap: snapCam && !(snapCam = false),
     velocity: { x:player.vx, z:player.vz },
     zoomOut: bike ? Math.min(2, sp * 0.2) : 0,   // in velocità la camera si alza
   });

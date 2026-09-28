@@ -524,6 +524,18 @@ MAPS.chiesa_samarate  = chiesaDi('Chiesa della SS. Trinità', { map:'samarate', 
 // eventuale forziere dipendono dalla posizione, così la stessa porta porta sempre allo stesso posto.
 const RESIDENTI = 10;
 const LOOT = ['pozione', 'pozione', 'etere', 'antidoto'];
+// via più vicina a una casella (nomi di case e fermate)
+function streetNear(streets, x, y){
+  let best = null, bd = 64;
+  for (const st of streets || []) for (const line of st.lines) for (let i = 1; i < line.length; i++){
+    const [ax, ay] = line[i - 1], [bx, by] = line[i];
+    const vx = bx - ax, vy = by - ay, l2 = vx*vx + vy*vy || 1;
+    const u = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / l2));
+    const d = (ax + u*vx - x) ** 2 + (ay + u*vy - y) ** 2;
+    if (d < bd){ bd = d; best = st.name; }
+  }
+  return best;
+}
 function houses(town, tiles, streets, list){
   const at = (x, y)=>tiles[y]?.[x] ?? ' ';
   const has = new Set(list.map(t=>t.x + ',' + t.y));
@@ -546,25 +558,13 @@ function houses(town, tiles, streets, list){
     for (const k of seen) size.set(k, seen.size);
     return seen.size;
   };
-  // via più vicina (per il nome della casa)
-  const streetNear = (x, y)=>{
-    let best = null, bd = 64;
-    for (const st of streets || []) for (const line of st.lines) for (let i = 1; i < line.length; i++){
-      const [ax, ay] = line[i - 1], [bx, by] = line[i];
-      const vx = bx - ax, vy = by - ay, l2 = vx*vx + vy*vy || 1;
-      const u = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / l2));
-      const d = (ax + u*vx - x) ** 2 + (ay + u*vy - y) ** 2;
-      if (d < bd){ bd = d; best = st.name; }
-    }
-    return best;
-  };
   for (let y = 0; y < tiles.length; y++) for (let x = 0; x < tiles[y].length; x++){
     if (at(x, y) !== 'D' || has.has(x + ',' + y)) continue;
     const front = [[0, 1], [-1, 0], [1, 0], [0, -1]].map(([dx, dy])=>[x + dx, y + dy]).find(([fx, fy])=>walk(at(fx, fy)));
     if (!front){ tiles[y] = tiles[y].slice(0, x) + '#' + tiles[y].slice(x + 1); continue; }   // porta murata: non ci si arriva
     const n = blockSize(x, y);
     const kind = n > 60 && (town === 'samarate' || town === 'jerago') ? 'capannone' : n > 12 ? 'appartamento' : 'casa';
-    const via = streetNear(x, y);
+    const via = streetNear(streets, x, y);
     const label = { casa:'Casa', appartamento:'Condominio', capannone:'Capannone' }[kind];
     const T = INTERNI[kind], mid = `${town}_int_${x}_${y}`;
     const [ex, ey] = T.exit[0];
@@ -574,6 +574,27 @@ function houses(town, tiles, streets, list){
     if (seed(x, y, 4) < 0.15) triggers.push({ x:T.chest[0], y:T.chest[1], type:'chest', id:mid, item:LOOT[Math.floor(seed(x, y, 5) * LOOT.length)], qty:1 });
     MAPS[mid] = { name: via ? `${label} in ${via}` : label, music:'town', town:true, indoor:true, tiles:T.tiles, triggers };
     list.push({ x, y, type:'portal', to:{ map:mid, x:ex, y:ey - 1 } });
+  }
+}
+
+// Fermate dell'autobus: una all'ingresso e una vicino a ogni luogo importante. Da una fermata
+// si va subito alle altre dello stesso paese (i paesi veri sono grandi: così non si cammina per chilometri).
+const STOP_NAMES = { entry:'Ingresso del paese', chiesa:'Chiesa', lazzaretto:'Chiesa del Lazzaretto', collegiata:'Collegiata',
+  castello:'Castello', officina:'Officine', negozio:'Bottega', locanda:'Locanda', gundam:'Parco del Gundam',
+  sanRocco:'Piazza San Rocco', piazza:'Piazza del Borgo', campanile:'Campanile', accademia:'Accademia' };
+function busStops(P, list, tiles, streets){
+  const used = new Set(list.map(t=>t.x + ',' + t.y));
+  for (const [k, p] of Object.entries(P)){
+    // mai sulla strada: una palina in un vicolo largo una casella lo chiuderebbe
+    const spot = [5, 4, 3, 2, 1, 0].map(i=>p.free?.[i]).find(c=>c && !used.has(c[0] + ',' + c[1]) && '.:'.includes(tiles[c[1]][c[0]])
+      && ![[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy])=>'dD'.includes(tiles[c[1] + dy]?.[c[0] + dx])));   // né davanti a una porta
+    if (!spot) continue;
+    used.add(spot[0] + ',' + spot[1]);
+    // nome: la casa vera (es. «Casa di Via Monetti 22») o il ruolo del luogo
+    const door = p.door && list.find(t=>t.type === 'portal' && t.x === p.door[0] && t.y === p.door[1]);
+    let label = STOP_NAMES[k] || (door && MAPS[door.to.map]?.name) || p.name || k;
+    if (list.some(t=>t.type === 'stop' && t.name === label)){ const via = streetNear(streets, spot[0], spot[1]); label += via ? ` (${via})` : ` (${k})`; }
+    list.push({ x:spot[0], y:spot[1], type:'stop', name:label });
   }
 }
 
@@ -590,6 +611,7 @@ function osmTown(id, name, worldAt, place){
   };
   for (const [x, y] of P.entry.portals) list.push({ x, y, type:'portal', to:{ map:'world', ...worldAt } });
   place(H);
+  busStops(P, list, t.tiles, t.streets);
   const tiles = t.tiles.map(r=>r.replace(/d/g, 'D'));   // ogni porta si apre
   houses(id, tiles, t.streets, list);
   MAPS[id] = { name, music:'town', town:true, tiles, streets:t.streets, triggers:list, osm:true,
