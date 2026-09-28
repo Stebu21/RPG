@@ -12,7 +12,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildEnvironment, areaTint } from './battleEnv.js';
-import { MOBILE_ZOOM } from './world3d.js';
 import { Person } from './character3d.js';
 import { drawMonster } from './sprites.js';
 
@@ -525,8 +524,16 @@ export class BattleStage {
 
   updateCamera(dt, t){
     const c = this.cam;
-    const mz = MOBILE_ZOOM();   // su telefono l'arena si vede per intero
-    const base = new THREE.Vector3(2.4 + Math.sin(t*0.25)*0.35, 2.1 * (1 + (mz - 1) * 0.8), 6.0 * mz);
+    // la camera inquadra sempre tutta l'arena (eroi a destra, mostri a sinistra):
+    // su schermi stretti (telefono in verticale) si allarga il campo visivo e ci si allontana
+    const asp = this.camera.aspect;
+    const fov = asp < 1 ? 58 : asp < 1.4 ? 46 : 38;
+    if (this.camera.fov !== fov){ this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
+    const halfW = 4.9;                                               // metà larghezza da far stare nello schermo
+    const fit = halfW / (Math.tan(THREE.MathUtils.degToRad(fov / 2)) * asp);
+    const dist = Math.max(6.0, fit);
+    const side = asp < 1 ? 0.6 : 2.4;                               // in verticale la camera sta quasi di fronte
+    const base = new THREE.Vector3(side + Math.sin(t*0.25)*0.35, 2.1 * dist / 6, dist);
     let look = new THREE.Vector3(-0.1, 1.1, 0);
     let pos = base;
     if (c.intro > 0){ c.intro -= dt; }

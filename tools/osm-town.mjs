@@ -34,10 +34,13 @@ function fromOverpass(json, lat0, lon0){
   const W = { motorway:10, trunk:9, primary:8, secondary:7.5, tertiary:6.8, residential:5.8, unclassified:5.2, service:3.6, pedestrian:6, living_street:5 };
   for (const el of json.elements){
     const t = el.tags || {};
-    const pts = el.geometry ? el.geometry.filter(Boolean).map(g=>P(g.lat, g.lon)) : null;
+    // le relazioni (multipoligoni, es. Palazzo Estense) usano il primo anello esterno
+    const outer = el.type === 'relation' ? el.members?.find(m=>m.role === 'outer' && m.geometry) : null;
+    const geom = el.geometry || outer?.geometry;
+    const pts = geom ? geom.filter(Boolean).map(g=>P(g.lat, g.lon)) : null;
     const pos = el.type === 'node' ? P(el.lat, el.lon) : el.center ? P(el.center.lat, el.center.lon) : null;
     if (t.highway && pts) out.roads.push({ pts, kind:t.highway, w:W[t.highway] || 2.5, name:t.name || '' });
-    else if (t.building && pts) out.buildings.push({ pts, kind:t.building === 'yes' ? (t.amenity === 'place_of_worship' ? 'church' : 'house') : t.building, name:t.name || '' });
+    else if ((t.building || (el.type === 'relation' && t.name)) && pts) out.buildings.push({ pts, kind:t.building === 'yes' ? (t.amenity === 'place_of_worship' ? 'church' : 'house') : t.building || 'civic', name:t.name || '' });
     else if (t.waterway && pts) out.water.push({ pts, w: t.waterway === 'river' ? 14 : 4 });
     else if ((t.leisure || t.landuse || t.natural) && pts && el.type === 'way')
       out.areas.push({ pts, kind:t.leisure || t.landuse || t.natural, name:t.name || '' });
@@ -104,7 +107,8 @@ const TOWNS = {
     src:'remote', tile:6, entry:'south', half:[480, 480],
     roles:{
       chiesa:     { nameRe:/san vittore|basilica/i, church:true, fallbackNear:[0, 0] },
-      casa3:      { nameRe:/estense/i, fallbackNear:[120, 250] },
+      casa3:      { nameRe:/estense/i, near:[-240, -44] },   // Palazzo Estense: in OSM è solo un "sito", si usa l'edificio più vicino   // Palazzo Estense: in OSM solo come sito
+      campanile:  { name:'Campanile di San Vittore', tower:true },
       casa1:      { near:[-200, -150] },
       casa2:      { near:[-60, -200] },
       casa4:      { near:[150, -180] },
