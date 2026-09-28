@@ -158,7 +158,7 @@ export const MAPS = {
     ],
   },
 
-  // Vedano Olona: il fiume Olona a ovest con la vecchia filanda sulla riva,
+  // Vedano Olona: il fiume Olona a ovest con la Chiesa del Lazzaretto sulla riva,
   // due ponti, la piazza con la chiesa di San Maurizio e — fedele alla
   // realtà — il parco pubblico con la statua del Gundam.
   vedano: {
@@ -192,7 +192,7 @@ export const MAPS = {
       { x:18, y:11, type:'portal', to:{ map:'negozio_vedano', x:4, y:5 } },
       { x:9,  y:14, type:'portal', to:{ map:'locanda_vedano', x:5, y:6 } },
       { x:20, y:14, type:'portal', to:{ map:'casa_vedano2', x:4, y:5 } },
-      { x:2,  y:11, type:'door_event', event:'filanda' },
+      { x:2,  y:11, type:'door_event', event:'lazzaretto' },
       { x:11, y:8,  type:'npc', npc:'vedano_custode', sprite:'#8a7a66' },
       { x:7,  y:4,  type:'npc', npc:'vedano_cittadino', sprite:'#b08968' },
       { x:16, y:12, type:'quest', quest:'vedano_lupi', sprite:'#cccccc' },

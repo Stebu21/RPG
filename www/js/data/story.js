@@ -45,7 +45,7 @@ export const NPCS = {
                                    'Se trovate libri in giro per la provincia, riportateli. Le multe per il ritardo si accumulano anche in tempo di crisi.'] },
   ],
   accademia_allievo: [
-    { name:'Allievo', lines:['Dicono che a Vedano Olona la vecchia filanda si sia... svegliata. Brrr.'] },
+    { name:'Allievo', lines:['Dicono che a Vedano Olona la vecchia Chiesa del Lazzaretto si sia... svegliata. Di notte suona la campana da sola. Brrr.'] },
   ],
   accademia_allieva: [
     { name:'Allieva', lines:['Ste e Riki, vero? In bocca al lupo per l’esame. Io l’anno scorso sono svenuta davanti a un Lumacone.'] },
@@ -76,19 +76,20 @@ export const NPCS = {
   ],
   varese_guardia: [
     { if:{ has:['sigillo_alba'], not:['sigillo_meriggio'] }, name:'Guardia',
-      lines:['Avete sistemato la filanda di Vedano? Allora provate a Castiglione Olona: la Collegiata è infestata, e c’è chi dice di averci visto entrare un ladro.'] },
+      lines:['Avete sistemato il Lazzaretto di Vedano? Allora provate a Castiglione Olona: la Collegiata è infestata, e c’è chi dice di averci visto entrare un ladro.'] },
     { name:'Guardia', lines:['La strada per Vedano Olona parte a sud-est. State sulla via: nei campi gironzolano brutte bestie.'] },
   ],
   vedano_custode: [
-    { if:{ has:['sigillo_alba'] }, name:'Vecchio Custode',
-      lines:['I telai si sono fermati. Quarant’anni che lavoro alla filanda, e non avevo mai sentito un silenzio così bello.',
+    { if:{ has:['sigillo_alba'] }, name:'Vecchio Sagrestano',
+      lines:['La campana del Lazzaretto ha smesso di suonare da sola. Quarant’anni che tengo le chiavi di quella chiesa, e non avevo mai sentito un silenzio così bello.',
              'A Castiglione, dicono, un ladro e una ragazza con l’arco si sono chiusi nella Collegiata. Gente strana, di questi tempi.'] },
-    { name:'Vecchio Custode', lines:['Voi due siete dell’Accademia? Allora ascoltate.',
-      'La filanda qui dietro, sull’Olona, di notte si accende da sola. Dentro c’è un gigante di mattoni che custodisce un sigillo luccicante.',
+    { name:'Vecchio Sagrestano', lines:['Voi due siete dell’Accademia? Allora ascoltate.',
+      'La Chiesa del Lazzaretto, di là dall’Olona, fu costruita per i malati della peste, secoli fa. Da quando è arrivata la nube viola, di notte la campana suona da sola.',
+      'Dentro, la vecchia statua del guardiano si è mossa. Tiene tra le mani un sigillo che brilla come l’alba.',
       'La porta è a ovest, oltre il ponte. Ho lasciato il chiavistello aperto: il resto è affar vostro.'] },
   ],
   vedano_cittadino: [
-    { name:'Cittadino', lines:['Di notte la filanda si illumina e i telai tessono da soli. Tessono COSA, poi?'] },
+    { name:'Cittadino', lines:['Di notte dal Lazzaretto si sentono passi di pietra. E la campana... chi la suona, se la chiesa è chiusa?'] },
   ],
   vedano_anziano: [
     { name:'Anziano', lines:['Ai miei tempi l’Olona era piena di pesci. Ora è piena di serpi grosse come tubi.'] },
@@ -153,26 +154,27 @@ export const EVENTS = {
     ],
   },
 
-  filanda: {
+  lazzaretto: {
     if:{ not:['sigillo_alba'] },
     steps:[
       { d:[
-        ['','La porta della vecchia filanda cigola. Dentro, i telai tessono fili di luce da soli...'],
-        ['Riki','Quello là in fondo dev’essere il padrone di casa.'],
-        ['???','CHI... DISTURBA... IL TURNO DI NOTTE...'],
-        ['Riki','Parla pure il mattone.'],
+        ['','La porta della Chiesa del Lazzaretto cigola. Dentro fa freddo; le candele si accendono da sole, una dopo l’altra.'],
+        ['Riki','Quella statua in fondo... si è appena girata.'],
+        ['???','CHI... DISTURBA... IL RIPOSO... DEI MIEI MALATI...'],
+        ['Ste','Il guardiano del lazzaretto. Eterna lo ha svegliato dopo quattro secoli.'],
+        ['Riki','Parla pure la pietra.'],
         ['Ste','Solo noi due, come ai vecchi tempi. Io lo rallento, tu lo tagli.'],
       ]},
       { battle:'boss_golem' },
       { d:[
-        ['','Il Golem crolla in un mucchio di mattoni fumanti. Tra le macerie brilla il SIGILLO DELL’ALBA.'],
+        ['','Il Guardiano si ferma, si inginocchia e torna statua. Tra le sue mani di pietra brilla il SIGILLO DELL’ALBA.'],
         ['Riki','Uno su quattro. E non abbiamo nemmeno saltato il pranzo.'],
         ['Ste','Il prossimo è a Castiglione Olona. Lì da soli non basteremo.'],
         ['','Hai ottenuto il Sigillo dell’Alba (1/4)! Prossima meta: Castiglione Olona.'],
       ]},
       { flag:'sigillo_alba' }, { heal:true },
     ],
-    doneSteps:[ { d:[['','La filanda è silenziosa. I telai, finalmente, riposano.']] } ],
+    doneSteps:[ { d:[['','La chiesa è silenziosa. Il guardiano veglia di nuovo, immobile, come ha fatto per secoli.']] } ],
   },
 
   collegiata: {

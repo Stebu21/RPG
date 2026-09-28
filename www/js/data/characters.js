@@ -6,7 +6,7 @@
 export const CHARACTERS = {
   ste: {
     name:'Ste', className:'Mago', color:'#7e57ff',
-    look:{ h:'tall', build:'slim', hair:'#2c2118', eyes:'#1a1a2a', beard:1 },
+    look:{ h:'tall', build:'slim', hair:'#2c2118', eyes:'#1a1a2a', beard:1, hairStyle:'quiff', outfit:'mage' },
     desc:'Alto, magro e atletico, barbetta curata e sguardo che non perde un dettaglio. Allievo prodigio dell’Accademia del Sacro Monte, migliore amico di Riki da sempre, innamorato di Sofy. Calmo, ironico, letale con la magia.',
     base:{ hp:46, mp:28, atk:7, def:7, mag:16, spr:11, spd:8 },
     growth:{ hp:8.0, mp:4.2, atk:1.2, def:1.3, mag:3.2, spr:2.2, spd:1.4 },
@@ -20,8 +20,8 @@ export const CHARACTERS = {
   },
   riki: {
     name:'Riki', className:'Samurai', color:'#e74c3c',
-    look:{ h:'mid', build:'wide', hair:'#101010', eyes:'#1a1a2a', beard:2, tattoo:true, curly:true },
-    desc:'Un metro e settanta di muscoli, ricci ribelli, braccia tatuate e barba folta. Migliore amico di Ste: dove va uno, va l’altro. La sua katana dello stile Shura non conosce esitazione.',
+    look:{ h:'short', build:'wide', hair:'#101010', eyes:'#1a1a2a', beard:3, tattoo:true, hairStyle:'tied', outfit:'samurai' },
+    desc:'Un metro e settanta di muscoli, più basso e massiccio di Ste, capelli lunghi legati indietro, braccia tatuate e barba lunga. Migliore amico di Ste: dove va uno, va l’altro. La sua katana dello stile Shura non conosce esitazione.',
     base:{ hp:62, mp:16, atk:15, def:11, mag:4, spr:7, spd:10 },
     growth:{ hp:10.8, mp:2.2, atk:3.1, def:2.2, mag:0.8, spr:1.4, spd:1.7 },
     learnset:[

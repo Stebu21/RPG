@@ -1,7 +1,7 @@
 // Titolo: account (registrazione/login) e slot di salvataggio.
 
 import { register, login, listSaves, loadGame, SLOTS } from '../engine/save.js';
-import { G, newGame, ensureDuo, DUO } from '../engine/state.js';
+import { G, newGame, migrate, regen, DUO } from '../engine/state.js';
 import { CHARACTERS } from '../data/characters.js';
 import { drawPortrait } from '../engine/sprites.js';
 import { playMusic, sfx } from '../engine/audio.js';
@@ -98,7 +98,9 @@ function startLoaded(slot){
   if (!sv){ return; }
   G.slot = slot;
   G.s = sv.state;
-  ensureDuo(G.s);   // salvataggi precedenti: il duo torna in testa al party
+  migrate(G.s);   // salvataggi precedenti: il duo torna in testa al party
+  // il tempo passato da quando hai salvato ha fatto riposare la squadra
+  regen(G.s, Math.max(0, (Date.now() - sv.time) / 1000) * 0.25);
   show('world');
 }
 

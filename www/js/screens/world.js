@@ -5,8 +5,11 @@ import { NPCS, EVENTS } from '../data/story.js';
 import { QUESTS, questState, questAccept, questReadyToComplete } from '../data/quests.js';
 import { ZONES, MONSTERS } from '../data/monsters.js';
 import { ITEMS, SHOPS, INN_PRICES } from '../data/items.js';
+import { EQUIP, TOMES } from '../data/equipment.js';
+import { ABILITIES } from '../data/abilities.js';
 import { CHARACTERS } from '../data/characters.js';
-import { G, fullHeal, addCharacter, addItem, ensureDuo, partnerOf } from '../engine/state.js';
+import { G, fullHeal, addCharacter, addItem, migrate, partnerOf, knownAbilities, statsOf, regen } from '../engine/state.js';
+import { saveGame } from '../engine/save.js';
 import { BLOCKED } from '../engine/sprites.js';
 import { World3D } from '../engine/world3d.js';
 import { Input } from '../engine/input.js';
@@ -95,7 +98,7 @@ function updateFollower(dt){
 const PARTNER_LINES = {
   riki: [
     [{ not:['intro_done'] }, 'Il Rettore ci aspetta. Non vorrai arrivare tardi all’unico esame che conta.'],
-    [{ not:['sigillo_alba'] }, 'Vedano, filanda, un mostro. Io taglio, tu fai le lucine. Il solito.'],
+    [{ not:['sigillo_alba'] }, 'Vedano, la chiesa del Lazzaretto, una statua che cammina. Io taglio, tu fai le lucine. Il solito.'],
     [{ not:['sigillo_meriggio'] }, 'Castiglione, la Collegiata. Dicono ci sia un ladro dentro. Il sigillo è nostro prima che suo.'],
     [{ not:['sigillo_vespro'] }, 'Un cavaliere di ottocento anni. Finalmente qualcuno che sa tenere una spada.'],
     [{ not:['sigillo_notte'] }, 'Un drago di lamiera a Samarate. E c’è Sofy: prova a non inciampare nei tuoi stessi incantesimi.'],
@@ -104,7 +107,7 @@ const PARTNER_LINES = {
   ],
   ste: [
     [{ not:['intro_done'] }, 'L’aula magna è di qua. Riki, prova a non addormentarti durante il discorso.'],
-    [{ not:['sigillo_alba'] }, 'La filanda di Vedano, a sud-est. Tu apri la strada, io ti copro con la magia.'],
+    [{ not:['sigillo_alba'] }, 'Il Lazzaretto di Vedano, a sud-est. Tu apri la strada, io ti copro con la magia.'],
     [{ not:['sigillo_meriggio'] }, 'Castiglione Olona. Un ladro nella Collegiata, un’ombra sull’altare: giornata piena.'],
     [{ not:['sigillo_vespro'] }, 'Il castello di Jerago. Ho letto che i fantasmi odiano il fuoco. O amano il fuoco. Vedremo.'],
     [{ not:['sigillo_notte'] }, 'Samarate... sì, Sofy dovrebbe essere lì. No, non sto arrossendo. È il riflesso del drago.'],
@@ -238,6 +241,7 @@ window.addEventListener('pad-back', ()=>{
     const btns = choiceButtons();
     sfx('cancel');
     btns[btns.length - 1]?.click();
+    if (choiceOpen()) return;   // «◀ Reparti»: si resta nel negozio
     dlgBox.classList.add('hidden');
     if (!dialogQueue) busy = false;
   } else if (dialogQueue){
@@ -380,29 +384,54 @@ function fireActionTrigger(t){
 }
 
 // ---------- negozio e locanda ----------
-function openShop(shopId){
-  const goods = SHOPS[shopId] || [];
-  const opts = goods.map(id=>{
-    const it = ITEMS[id];
-    return {
-      label:`${it.name} — ${it.price} oro`,
-      keep:true,
-      cb:()=>{
-        if (G.s.gold >= it.price){
-          G.s.gold -= it.price; addItem(id, 1); sfx('confirm');
-          dlgText.textContent = `${it.name} acquistato! Oro: ${G.s.gold}`;
-        } else {
-          sfx('cancel');
-          dlgText.textContent = 'Oro insufficiente!';
-        }
-      },
-    };
-  });
-  opts.push({ label:'Chiudi', cb:()=>{ dlgBox.classList.add('hidden'); } });
-  dlgName.textContent = 'Negozio';
-  dlgName.style.display = 'block';
-  dlgText.textContent = `Benvenuti! Oro: ${G.s.gold}`;
+// Negozio in stile FF: prima il reparto, poi la merce. Gli abiti e le armi
+// vanno nello zaino dell'equipaggiamento, i tomi insegnano subito la tecnica.
+const SHOP_DEPTS = [['oggetti','Oggetti'], ['armi','Armi'], ['abiti','Abiti e accessori'], ['magie','Magie e tecniche']];
+function statTxt(stats){
+  const N = { atk:'ATK', def:'DEF', mag:'MAG', spr:'SPR', spd:'VEL', hp:'HP', mp:'MP', crit:'CRIT' };
+  return Object.entries(stats).map(([k, v])=>`+${k === 'crit' ? Math.round(v*100) + '%' : v} ${N[k]}`).join(' ');
+}
+function shopHeader(title, msg){
+  dlgName.textContent = title; dlgName.style.display = 'block';
+  dlgText.textContent = msg ?? `Oro: ${G.s.gold}`;
   dlgBox.classList.remove('hidden');
+}
+function openShop(shopId){
+  const shop = SHOPS[shopId] || { oggetti:[] };
+  shopHeader('Negozio', `Benvenuti! Cosa cercate? Oro: ${G.s.gold}`);
+  const opts = SHOP_DEPTS.filter(([k])=>shop[k]?.length).map(([k, label])=>({ label, keep:true, cb:()=>openDept(shopId, k) }));
+  opts.push({ label:'Chiudi', cb:()=>{ dlgBox.classList.add('hidden'); } });
+  showChoice(opts);
+}
+function buy(price, give){
+  if (G.s.gold < price){ sfx('cancel'); dlgText.textContent = 'Oro insufficiente!'; return; }
+  G.s.gold -= price; sfx('confirm'); dlgText.textContent = give() + ` Oro: ${G.s.gold}`;
+}
+function openDept(shopId, dept){
+  const ids = SHOPS[shopId][dept];
+  shopHeader(SHOP_DEPTS.find(d=>d[0] === dept)[1]);
+  const opts = ids.map(id=>{
+    if (dept === 'oggetti'){
+      const it = ITEMS[id];
+      const owned = it.type === 'key' && G.s.items[id] > 0;
+      return { label:`${it.name} — ${it.price} oro<small>${it.desc}</small>`, keep:true, disabled:owned,
+               cb:()=>buy(it.price, ()=>{ addItem(id, 1); return `${it.name} acquistato!`; }) };
+    }
+    if (dept === 'magie'){
+      const t = TOMES[id], cs = G.s.chars[t.who];
+      const known = cs && knownAbilities(cs).includes(t.ab);
+      const who = CHARACTERS[t.who].name;
+      return { label:`${t.name} — ${t.price} oro<small>${who}: ${ABILITIES[t.ab].desc || ''}${!cs ? ' (non ancora in squadra)' : known ? ' (già appresa)' : ''}</small>`,
+               keep:true, disabled:!cs || known,
+               cb:()=>buy(t.price, ()=>{ cs.tomes.push(t.ab); sfx('levelup'); return `${who} impara ${ABILITIES[t.ab].name}!`; }) };
+    }
+    const e = EQUIP[id];
+    const who = e.who ? e.who.map(w=>CHARACTERS[w].name).join(', ') : 'tutti';
+    const have = G.s.gear[id] || 0;
+    return { label:`${e.name} — ${e.price} oro<small>${statTxt(e.stats)} · ${who}${have ? ` · ne hai ${have}` : ''}</small>`, keep:true,
+             cb:()=>buy(e.price, ()=>{ G.s.gear[id] = (G.s.gear[id] || 0) + 1; return `${e.name} acquistato! Equipaggialo dal menu Squadra.`; }) };
+  });
+  opts.push({ label:'◀ Reparti', keep:true, cb:()=>openShop(shopId) });
   showChoice(opts);
 }
 
@@ -430,6 +459,7 @@ export function loadMap(name, x, y){
   hudLoc.textContent = map.name;
   playMusic(map.music || 'world');
   checkEnterEvents();
+  setTimeout(autosave, 300);            // anche a ogni cambio di mappa (dopo eventuali dialoghi d'ingresso: salta se occupato)
 }
 
 // ---------- incontri ----------
@@ -502,7 +532,26 @@ function moveAxis(axis, d){
   return false;
 }
 
+// ---------- autosalvataggio ----------
+const AUTOSAVE_EVERY = 120;   // secondi di gioco
+let autosaveT = 0;
+const toast = document.getElementById('autosave-toast');
+export function autosave(){
+  if (!G.account || !G.s || busy) return;
+  const leader = G.s.hero;
+  saveGame(G.account, G.slot, G.s, { label:`${CHARACTERS[leader].name} Lv.${G.s.chars[leader].level} — ${MAPS[G.s.map].name} (auto)` });
+  autosaveT = 0;
+  toast.classList.remove('hidden');
+  toast.style.animation = 'none'; void toast.offsetWidth; toast.style.animation = '';
+  clearTimeout(toast._t); toast._t = setTimeout(()=>toast.classList.add('hidden'), 2300);
+}
+
 function update(dt){
+  if (!busy){
+    regen(G.s, dt);                       // HP e MP tornano piano piano camminando
+    autosaveT += dt;
+    if (autosaveT > AUTOSAVE_EVERY) autosave();
+  }
   // salto/sobbalzo (anche durante i dialoghi, per chiudere l'animazione)
   if (player.hop > 0 || player.hopV > 0){
     player.hopV -= 22 * dt; player.hop += player.hopV * dt;
@@ -675,7 +724,7 @@ registerScreen('world', {
   el,
   enter(params){
     G.s.quests ||= {};  // compatibilità con i salvataggi precedenti
-    ensureDuo(G.s);
+    migrate(G.s);
     if (!params?.resume){
       map = MAPS[G.s.map];
       player = newPlayer(G.s.x, G.s.y);

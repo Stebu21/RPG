@@ -3,6 +3,7 @@
 import { CHARACTERS, PARTY_MAX } from '../data/characters.js';
 import { ABILITIES } from '../data/abilities.js';
 import { ITEMS } from '../data/items.js';
+import { EQUIP, ATTRS, SLOTS_EQ, SLOT_NAMES, canEquip } from '../data/equipment.js';
 import { MAPS, SIGILLI } from '../data/maps.js';
 import { missionText } from '../data/story.js';
 import { QUESTS, questProgressText } from '../data/quests.js';
@@ -31,7 +32,7 @@ function charRow(id, inParty){
   row.innerHTML = `
     <div class="cr-dot" style="background:${def.color}"></div>
     <div class="cr-main"><b>${def.name}</b> — ${def.className} Lv.${cs.level}
-      <small>${inParty ? '⭐ in squadra' : 'riserva'}</small><br>
+      <small>${inParty ? '⭐ in squadra' : 'riserva'}${cs.pts ? ` · <span style="color:#ffd76a">✦ ${cs.pts} punti</span>` : ''}</small><br>
       <small>HP ${cs.hp}/${st.hp} · MP ${cs.mp}/${st.mp}</small></div>`;
   row.onclick = ()=>{ sfx('select'); renderCharDetail(id); };
   return row;
@@ -69,6 +70,8 @@ function renderCharDetail(id){
       <div>VEL ${st.spd}</div><div>EXP ${next}</div>
     </div>`;
   drawPortrait(box.querySelector('.portrait'), def);
+  box.appendChild(attrSection(id));
+  box.appendChild(equipSection(id));
   const btnRow = document.createElement('div');
   btnRow.className = 'btn-row';
   const back = document.createElement('button');
@@ -125,6 +128,99 @@ function renderCharDetail(id){
   r.innerHTML = `<span class="ab-lv" style="color:#ff6b81">LIMITE</span> <b>${lim.name}</b><br><small>${lim.desc||''} (HP sotto il 30%)</small>`;
   box.appendChild(r);
   contentEl.appendChild(box);
+}
+
+// ---------- CARATTERISTICHE (stile D&D) ----------
+function attrSection(id){
+  const cs = G.s.chars[id];
+  const wrap = document.createElement('div');
+  wrap.className = 'attr-box';
+  wrap.innerHTML = `<h3>Caratteristiche <small>${cs.pts ? `— ${cs.pts} punti da assegnare` : ''}</small></h3>`;
+  for (const [k, a] of Object.entries(ATTRS)){
+    const row = document.createElement('div');
+    row.className = 'attr-row';
+    row.innerHTML = `<b>${k}</b><span>${a.name}<small>${a.desc} per punto</small></span><em>${cs.attr[k] || 0}</em>`;
+    const b = document.createElement('button');
+    b.className = 'btn'; b.textContent = '+';
+    b.disabled = !cs.pts;
+    b.onclick = ()=>{
+      const before = statsOf(cs);
+      cs.attr[k] = (cs.attr[k] || 0) + 1; cs.pts--;
+      const after = statsOf(cs);
+      cs.hp += after.hp - before.hp; cs.mp += after.mp - before.mp;   // i massimi aumentati si riempiono
+      sfx('confirm'); renderCharDetail(id);
+    };
+    row.appendChild(b);
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
+// ---------- EQUIPAGGIAMENTO ----------
+function equipSection(id){
+  const cs = G.s.chars[id];
+  const wrap = document.createElement('div');
+  wrap.className = 'attr-box';
+  wrap.innerHTML = '<h3>Equipaggiamento</h3>';
+  for (const slot of SLOTS_EQ){
+    const cur = EQUIP[cs.eq[slot]];
+    const row = document.createElement('div');
+    row.className = 'attr-row';
+    row.innerHTML = `<b>${SLOT_NAMES[slot]}</b><span>${cur ? cur.name : '—'}<small>${cur ? statLine(cur.stats) : 'nessuno'}</small></span>`;
+    const b = document.createElement('button');
+    b.className = 'btn'; b.textContent = 'Cambia';
+    b.onclick = ()=>{ sfx('select'); renderEquipPick(id, slot); };
+    row.appendChild(b);
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+function statLine(stats){
+  const N = { atk:'ATK', def:'DEF', mag:'MAG', spr:'SPR', spd:'VEL', hp:'HP', mp:'MP', crit:'CRIT' };
+  return Object.entries(stats).map(([k, v])=>`+${k === 'crit' ? Math.round(v*100) + '%' : v} ${N[k]}`).join(' ');
+}
+function equip(id, slot, itemId){
+  const cs = G.s.chars[id];
+  const before = statsOf(cs);
+  const old = cs.eq[slot];
+  if (old) G.s.gear[old] = (G.s.gear[old] || 0) + 1;       // il vecchio torna nello zaino
+  if (itemId){ G.s.gear[itemId]--; if (G.s.gear[itemId] <= 0) delete G.s.gear[itemId]; }
+  cs.eq[slot] = itemId || null;
+  const after = statsOf(cs);
+  cs.hp = Math.max(1, Math.min(after.hp, cs.hp + after.hp - before.hp));
+  cs.mp = Math.max(0, Math.min(after.mp, cs.mp + after.mp - before.mp));
+}
+function renderEquipPick(id, slot){
+  const cs = G.s.chars[id];
+  contentEl.innerHTML = `<p style="padding:6px"><b>${CHARACTERS[id].name}</b> — ${SLOT_NAMES[slot]}</p>`;
+  const cur = statsOf(cs);
+  const opts = Object.keys(G.s.gear).filter(k=>G.s.gear[k] > 0 && EQUIP[k].slot === slot && canEquip(k, id));
+  if (!opts.length) contentEl.insertAdjacentHTML('beforeend', '<p style="padding:6px;color:#9ab">Niente di adatto nello zaino. Visita i negozi!</p>');
+  for (const k of opts){
+    // anteprima: differenza di statistiche rispetto a ora
+    const trial = { ...cs, eq:{ ...cs.eq, [slot]:k } };
+    const st = statsOf(trial);
+    const diff = ['atk','def','mag','spr','spd','hp','mp'].map(s=>{
+      const d = st[s] - cur[s];
+      return d ? `<span style="color:${d > 0 ? '#7ee787' : '#ff8a8a'}">${s.toUpperCase()} ${d > 0 ? '+' : ''}${d}</span>` : '';
+    }).filter(Boolean).join(' ');
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `<div><b>${EQUIP[k].name}</b> x${G.s.gear[k]}<br><small>${diff || 'nessuna variazione'}</small></div>`;
+    const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'EQUIPAGGIA';
+    b.onclick = ()=>{ equip(id, slot, k); sfx('confirm'); renderCharDetail(id); };
+    row.appendChild(b); contentEl.appendChild(row);
+  }
+  const btns = document.createElement('div'); btns.className = 'btn-row';
+  if (cs.eq[slot]){
+    const off = document.createElement('button'); off.className = 'btn btn-dim'; off.textContent = 'Togli';
+    off.onclick = ()=>{ equip(id, slot, null); sfx('cancel'); renderCharDetail(id); };
+    btns.appendChild(off);
+  }
+  const back = document.createElement('button'); back.className = 'btn btn-dim'; back.textContent = '◀ Indietro';
+  back.onclick = ()=>{ sfx('cancel'); renderCharDetail(id); };
+  btns.appendChild(back);
+  contentEl.appendChild(btns);
 }
 
 // ---------- OGGETTI ----------

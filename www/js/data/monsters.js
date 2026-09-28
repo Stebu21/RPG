@@ -46,12 +46,12 @@ export const MONSTERS = {
             {name:'Sabbia negli occhi', type:'phys', power:7, element:'terra', target:'enemy', w:1} ],
   },
   boss_golem: {
-    name:'Golem della Filanda', sprite:'golem', pal:{ a:'#a04000', b:'#6e2c00', c:'#f5b041' }, boss:true,
+    name:'Guardiano del Lazzaretto', sprite:'golem', pal:{ a:'#8e8a80', b:'#4f4c47', c:'#7fd3ff' }, boss:true,
     level:9, hp:340, atk:18, def:13, mag:8, spr:8, spd:5, exp:220, gold:180,
-    weak:['acqua','tuono'], resist:['fuoco','terra'],
-    moves:[ {name:'Pugno di mattoni', type:'phys', power:16, element:'terra', target:'enemy', w:3},
-            {name:'Vapore rovente', type:'mag', power:12, element:'fuoco', target:'enemies', w:2},
-            {name:'Ingranaggio impazzito', type:'phys', power:22, element:'neutro', target:'enemy', w:1} ],
+    weak:['sacro','tuono'], resist:['terra','oscurita'],
+    moves:[ {name:'Pugno di pietra', type:'phys', power:16, element:'terra', target:'enemy', w:3},
+            {name:'Miasma antico', type:'mag', power:12, element:'oscurita', target:'enemies', w:2},
+            {name:'Rintocco funebre', type:'phys', power:22, element:'neutro', target:'enemy', w:1} ],
   },
 
   // ----- Zona 3: Castiglione Olona (lv 10-15) -----

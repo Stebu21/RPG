@@ -14,6 +14,64 @@ import { Person } from './character3d.js';
 import { drawMonster } from './sprites.js';
 
 const rnd = (a, b)=>a + Math.random() * (b - a);
+
+// esultanze di vittoria alla Fortnite: ognuna muove braccia, gambe e busto
+// in funzione del tempo v dall'inizio della festa
+const EMOTES = {
+  floss(p, v){
+    const k = Math.sin(v * 9);
+    p.arms.forEach((a, i)=>{ a.sh.rotation.z = (i ? 1 : -1) * 0.05 + k * 0.8; a.sh.rotation.x = (k > 0 ? 0.35 : -0.35) * (i ? 1 : -1); a.el.rotation.x = 0; });
+    p.torso.position.x = -k * 0.04; p.torso.rotation.z = k * 0.08;
+  },
+  dab(p, v){
+    const on = (v % 1.4) > 0.35;
+    const [A, B] = p.arms;
+    A.sh.rotation.set(on ? -2.3 : -0.3, 0, on ? -0.9 : -0.05); A.el.rotation.x = 0;
+    B.sh.rotation.set(on ? -1.4 : -0.3, 0, on ? -1.3 : 0.05); B.el.rotation.x = on ? -2.2 : -0.4;
+    p.head.rotation.set(on ? 0.5 : 0, 0, on ? 0.35 : 0);
+  },
+  jumpspin(p, v, o){
+    const ph = v % 1.1;
+    o.hop = Math.max(0, Math.sin(ph / 1.1 * Math.PI)) * 0.6;
+    o.spin = (ph / 1.1) * Math.PI * 2;
+    p.arms.forEach((a, i)=>{ a.sh.rotation.z = (i ? 1 : -1) * 1.2; a.sh.rotation.x = 0; a.el.rotation.x = 0; });
+  },
+  fistpump(p, v, o){
+    const k = Math.abs(Math.sin(v * 6));
+    const [A, B] = p.arms;
+    A.sh.rotation.set(-2.8 + k * 0.5, 0, -0.05); A.el.rotation.x = -0.4 - k * 0.6;
+    B.sh.rotation.set(-0.2, 0, 0.1); B.el.rotation.x = -1.2;
+    o.hop = k * 0.12;
+  },
+  robot(p, v){
+    const step = Math.floor(v * 3) % 4;
+    const [A, B] = p.arms;
+    A.sh.rotation.set(step % 2 ? -1.57 : 0, 0, -0.05); A.el.rotation.x = step % 2 ? 0 : -1.57;
+    B.sh.rotation.set(step % 2 ? 0 : -1.57, 0, 0.05); B.el.rotation.x = step % 2 ? -1.57 : 0;
+    p.head.rotation.y = [0.5, 0, -0.5, 0][step];
+    p.torso.rotation.y = [0.2, 0, -0.2, 0][step];
+  },
+  armwave(p, v, o){
+    const k = Math.sin(v * 7);
+    p.arms.forEach((a, i)=>{ a.sh.rotation.x = -0.4 + k * (i ? 1 : -1) * 0.9; a.sh.rotation.z = (i ? 1 : -1) * (0.4 + Math.abs(k) * 0.5); a.el.rotation.x = -0.3; });
+    p.legs.forEach((l, i)=>{ l.knee.rotation.x = Math.max(0, (i ? k : -k)) * 0.9; l.hip.rotation.x = -Math.max(0, (i ? k : -k)) * 0.5; });
+    o.hop = Math.abs(k) * 0.05;
+  },
+  bow(p, v){
+    const k = Math.min(1, (v % 2.2) / 0.5) * (v % 2.2 < 1.6 ? 1 : Math.max(0, 1 - (v % 2.2 - 1.6) / 0.4));
+    p.torso.rotation.x = k * 0.9;
+    p.arms.forEach(a=>{ a.sh.rotation.x = k * 0.3; a.el.rotation.x = -0.1; });
+  },
+  loser(p, v){
+    // la "L" sulla fronte con saltelli laterali
+    const [A, B] = p.arms;
+    A.sh.rotation.set(-2.6, 0, -0.5); A.el.rotation.x = -1.6;
+    B.sh.rotation.set(-0.2, 0, 0.1); B.el.rotation.x = -0.3;
+    p.legs.forEach((l, i)=>{ const k = Math.max(0, Math.sin(v * 8 + i * Math.PI)); l.hip.rotation.x = -k * 0.9; l.knee.rotation.x = k * 1.4; });
+  },
+};
+const EMOTE_IDS = Object.keys(EMOTES);
+let lastEmotes = [];
 const ease = t=>t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
 
 // texture morbida per le particelle
@@ -171,13 +229,19 @@ export class BattleStage {
     B.allies.forEach((a, i)=>{
       const p = new Person(a.def, a.id);
       p.root.scale.setScalar(1.55);
+      p.setDrawn(true);
       const home = new THREE.Vector3(2.3 + i * 0.35, 0, -0.9 + i * 1.05);
       p.root.position.copy(home);
       s.add(p.root);
       const aura = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.55, 32), new THREE.MeshBasicMaterial({ color:0xff4d6d, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide }));
       aura.rotation.x = -Math.PI/2; aura.position.y = 0.04; s.add(aura);
-      a.o3 = { p, home, aura, walk:0, ko:0, hop:0 };
+      a.o3 = { p, home, aura, walk:0, ko:0, hop:0, spin:0 };
     });
+    // esultanze diverse per ciascuno e diverse dalla battaglia precedente
+    const pool = EMOTE_IDS.filter(e=>!lastEmotes.includes(e)).sort(()=>Math.random() - 0.5);
+    B.allies.forEach((a, i)=>{ a.o3.emote = pool[i % pool.length]; });
+    lastEmotes = B.allies.map(a=>a.o3.emote);
+    this.victoryT = 0;
 
     // camera: introduzione che parte stretta sui nemici e si allarga
     this.cam.pos.set(-1, 1.6, 4.2); this.cam.look.set(-2.4, 1.2, 0);
@@ -349,6 +413,7 @@ export class BattleStage {
     if (this.bgT > 0.1){ this.bgT = 0; this.paintBackdrop(this.bgCanvas.getContext('2d'), 2048, 900, t); this.bgTex.needsUpdate = true; }
 
     for (const e of B.enemies) this.updateEnemy(e, dt, t);
+    if (B.victory) this.victoryT += dt;
     for (const a of B.allies) this.updateAlly(a, dt, t);
 
     // effetti
@@ -430,13 +495,13 @@ export class BattleStage {
       pos.x -= Math.sin((1 - a.lungeT/0.42) * Math.PI) * 0.7;
     }
     if (a.shakeT > 0) pos.x += (Math.random()*2-1) * a.shakeT * 0.4 + a.shakeT * 0.5;
-    // vittoria: saltelli
-    if (this.B.victory && !ko){ o.hop = Math.abs(Math.sin(t*5 + a.o3.home.z)) * 0.35; face = Math.PI * 0.1; } else o.hop = 0;
+    const party = this.B.victory && !ko;
+    if (party) face = Math.atan2(this.camera.position.x - pos.x, this.camera.position.z - pos.z);   // festeggia verso la camera
+    o.hop = 0; o.spin = 0;
     p.update(dt, face, speed, o.walk);
-    p.place(pos.x, pos.z, 0, o.hop);
 
     // pose di combattimento sopra la camminata
-    const R = p.arms[1], L = p.arms[0];
+    const R = p.weaponArm, L = p.arms.find(x=>x !== R);
     if (a.dashT > 0){
       const q = 1 - a.dashT / a.dashDur;
       if (q > 0.36 && q < 0.62){                    // fendente
@@ -451,8 +516,8 @@ export class BattleStage {
       const s = 1 - a.castT / 0.55;
       for (const arm of [L, R]){ arm.sh.rotation.x = -2.2 - Math.sin(s*Math.PI)*0.6; arm.el.rotation.x = -0.2; }
       if (!a._castFx){ a._castFx = true; this.castCircle(a); }
-    } else if (this.B.victory && !ko){
-      R.sh.rotation.x = -2.9; R.el.rotation.x = -0.3;
+    } else if (party){
+      EMOTES[o.emote](p, this.victoryT + o.home.z * 0.3, o);
     } else if (!ko){
       // guardia: braccia leggermente avanti, ginocchia piegate
       R.sh.rotation.x = -0.3 + Math.sin(t*2 + o.home.z)*0.05; R.el.rotation.x = -0.55;
@@ -460,6 +525,8 @@ export class BattleStage {
       for (const l of p.legs){ l.hip.rotation.x = -0.18; l.knee.rotation.x = 0.3; }
     }
     if (a.castT <= 0) a._castFx = false;
+    p.place(pos.x, pos.z, 0, o.hop);
+    if (o.spin) p.body.rotation.y += o.spin;
     // KO: a terra
     p.body.rotation.x = -o.ko * Math.PI/2 * 0.95;
     p.root.position.y = o.hop + o.ko * 0.12;

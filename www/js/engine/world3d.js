@@ -64,7 +64,7 @@ function textures(){
     gr.addColorStop(0, 'rgba(60,50,30,0)'); gr.addColorStop(1, 'rgba(60,50,30,.25)');
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
   }, true);
-  // mattoni rossi (filanda, cortine)
+  // mattoni rossi (cortine, muretti)
   TEX.brick = canvasTex(128, 128, (g, w, h)=>{
     g.fillStyle = '#8a8076'; g.fillRect(0,0,w,h);
     for (let r=0; r<16; r++) for (let k=0; k<5; k++){
@@ -591,8 +591,8 @@ export class World3D {
       const bx0 = Math.min(...xs), bx1 = Math.max(...xs)+1, by0 = Math.min(...ys), by1 = Math.max(...ys)+1;
       const doors = cells.filter(([cx,cy])=>getCh(cx,cy) === 'D');
       const church = cells.some(([cx,cy])=>getCh(cx,cy) === 'C');
-      const industrial = tris.some(t=>t.type === 'door_event' && t.x >= bx0 && t.x < bx1 && t.y >= by0 && t.y < by1);
-      this.building(g, bx0, by0, bx1, by1, doors, church, industrial, plasterPal[(hash(bx0, by0, 80)*plasterPal.length)|0]);
+      const lazzaretto = tris.some(t=>t.type === 'door_event' && t.event === 'lazzaretto' && t.x >= bx0 && t.x < bx1 && t.y >= by0 && t.y < by1);
+      this.building(g, bx0, by0, bx1, by1, doors, church, lazzaretto, plasterPal[(hash(bx0, by0, 80)*plasterPal.length)|0]);
     }
 
     // --- oggetti singoli ---
@@ -682,11 +682,11 @@ export class World3D {
     }
   }
 
-  building(g, x0, y0, x1, y1, doors, church, industrial, plasterColor){
+  building(g, x0, y0, x1, y1, doors, church, lazzaretto, plasterColor){
     const T = textures();
     const w = x1 - x0, d = y1 - y0, cx = (x0 + x1)/2, cz = (y0 + y1)/2;
-    const wallH = church ? 2.6 : industrial ? 2.0 : 1.5 + Math.min(1.2, d * 0.35);
-    const wallM = church ? mat(0xf2ede2, { map:T.stone }) : industrial ? mat(0xffffff, { map:T.brick }) : mat(plasterColor, { map:T.plaster });
+    const wallH = church ? 2.6 : lazzaretto ? 1.9 : 1.5 + Math.min(1.2, d * 0.35);
+    const wallM = church ? mat(0xf2ede2, { map:T.stone }) : lazzaretto ? mat(0xe9e0cc, { map:T.plaster }) : mat(plasterColor, { map:T.plaster });
     const inset = 0.04;
     addBox(g, w - inset*2, wallH, d - inset*2, wallM, cx, wallH/2, cz);
     // zoccolo in pietra
@@ -696,7 +696,7 @@ export class World3D {
 
     // tetto
     const alongX = w >= d;
-    const roofH = church ? 1.0 : industrial ? 0.6 : 0.7 + Math.min(w, d) * 0.12;
+    const roofH = church ? 1.0 : lazzaretto ? 0.8 : 0.7 + Math.min(w, d) * 0.12;
     const roof = new THREE.Mesh(prismRoof(w, d, roofH, alongX), mat(0xd9cfc6, { map:T.roof, roughness:0.9 }));
     roof.position.set(cx, wallH + 0.05, cz); roof.castShadow = true; roof.receiveShadow = true;
     g.add(roof);
@@ -771,34 +771,33 @@ export class World3D {
       this.animated.push({ update:t=>{ bell.rotation.x = Math.sin(t*1.5) * 0.25; } });
     }
 
-    if (industrial){
-      // la vecchia filanda sull'Olona: ciminiera in mattoni con fumo
-      const chX = x0 + 0.4, chZ = y0 + 0.4;
-      const chim = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.32, 4.5, 12), mat(0xffffff, { map:T.brick }));
-      chim.position.set(chX, 2.25, chZ); chim.castShadow = true; g.add(chim);
-      addBox(g, 0.5, 0.15, 0.5, mat(0x5a3a2a), chX, 4.5, chZ);
-      const smokeM = new THREE.MeshStandardMaterial({ color:0xcfcfcf, transparent:true, opacity:0.5, depthWrite:false });
-      const puffs = [];
-      for (let i=0; i<6; i++){
-        const p = new THREE.Mesh(new THREE.IcosahedronGeometry(0.25, 1), smokeM.clone());
-        g.add(p); puffs.push(p);
+    if (lazzaretto){
+      // Chiesa del Lazzaretto: portico ad archi sulla facciata e campanile a vela
+      const stone = mat(0xd8d0c0, { map:T.stone });
+      const n = Math.max(2, Math.round(w * 1.3));
+      for (let k=0; k<=n; k++){
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.95, 10), stone);
+        col.position.set(x0 + 0.15 + k * (w - 0.3) / n, 0.47, south + 0.45); col.castShadow = true; g.add(col);
       }
-      this.animated.push({ update:t=>{
-        puffs.forEach((p, i)=>{
-          const k = ((t*0.25 + i/6) % 1);
-          p.position.set(chX + k*1.2, 4.7 + k*2.5, chZ - k*0.4);
-          p.scale.setScalar(0.6 + k*2.2);
-          p.material.opacity = 0.45 * (1 - k);
-        });
-      } });
-      // insegna
-      const sign = canvasTex(256, 48, (c2, w2, h2)=>{
-        c2.fillStyle = '#e8dcc0'; c2.fillRect(0,0,w2,h2);
-        c2.fillStyle = '#5a2a1a'; c2.font = 'bold 28px Georgia, serif'; c2.textAlign = 'center';
-        c2.fillText('FILANDA OLONA', w2/2, 34);
+      addBox(g, w, 0.12, 0.6, stone, cx, 1.0, south + 0.3);                     // architrave del portico
+      const pr = new THREE.Mesh(prismRoof(w + 0.1, 0.62, 0.22, true), mat(0xd9cfc6, { map:T.roof }));
+      pr.position.set(cx, 1.06, south + 0.3); pr.castShadow = true; g.add(pr);
+      // vela campanaria in cima alla facciata, con campana che oscilla
+      addBox(g, 0.55, 0.7, 0.14, stone, cx, wallH + roofH + 0.25, south - 0.1);
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.13, 0.18, 10), mat(0xb08d3c, { metalness:1, roughness:0.35 }));
+      bell.position.set(cx, wallH + roofH + 0.25, south - 0.02); g.add(bell);
+      this.animated.push({ update:t=>{ bell.rotation.x = Math.sin(t*2.2) * 0.35; } });
+      const cross = new THREE.Group();
+      addBox(cross, 0.04, 0.3, 0.04, mat(0x3a3530), 0, 0, 0); addBox(cross, 0.18, 0.04, 0.04, mat(0x3a3530), 0, 0.06, 0);
+      cross.position.set(cx, wallH + roofH + 0.78, south - 0.1); g.add(cross);
+      // targa sopra il portale
+      const sign = canvasTex(320, 48, (c2, w2, h2)=>{
+        c2.fillStyle = '#ece4d2'; c2.fillRect(0,0,w2,h2);
+        c2.fillStyle = '#4a3a2a'; c2.font = 'bold 24px Georgia, serif'; c2.textAlign = 'center';
+        c2.fillText('CHIESA DEL LAZZARETTO', w2/2, 33);
       });
-      const s = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(2.6, w - 0.2), 0.35), new THREE.MeshStandardMaterial({ map:sign }));
-      s.position.set(cx, wallH - 0.3, south + 0.02); g.add(s);
+      const sg = new THREE.Mesh(new THREE.PlaneGeometry(Math.min(2.4, w - 0.1), 0.3), new THREE.MeshStandardMaterial({ map:sign }));
+      sg.position.set(cx, wallH - 0.35, south + 0.02); g.add(sg);
     }
   }
 
@@ -938,10 +937,13 @@ export class World3D {
     if (kind === '1'){            // Varese: campanile del Bernascone e palazzo Estense
       campanile(-0.1, -0.35, 1.6);
       addBox(vg, 0.9, 0.35, 0.3, mat(0xf0d9a8, { map:T.plaster }), 0.35, 0.18, -0.55);
-    } else if (kind === '2'){     // Vedano: filanda con ciminiera sull'Olona
-      addBox(vg, 0.6, 0.3, 0.35, mat(0xffffff, { map:T.brick }), -0.75, 0.15, -0.2);
-      const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.0, 8), mat(0xffffff, { map:T.brick }));
-      ch.position.set(-0.95, 0.5, -0.3); ch.castShadow = true; vg.add(ch);
+    } else if (kind === '2'){     // Vedano: la Chiesa del Lazzaretto col portico e la vela campanaria
+      addBox(vg, 0.5, 0.35, 0.4, mat(0xe9e0cc, { map:T.plaster }), -0.7, 0.18, -0.25);
+      const lr = new THREE.Mesh(prismRoof(0.5, 0.4, 0.2, false), mat(0xd9cfc6, { map:T.roof })); lr.position.set(-0.7, 0.35, -0.25); vg.add(lr);
+      addBox(vg, 0.16, 0.2, 0.05, mat(0xd8d0c0, { map:T.stone }), -0.7, 0.62, -0.05);
+      for (const cx2 of [-0.9, -0.77, -0.63, -0.5]){
+        const c = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), mat(0xd8d0c0)); c.position.set(cx2, 0.11, -0.02); vg.add(c);
+      }
       campanile(0.2, -0.3, 1.0);
     } else if (kind === '3'){     // Castiglione: la Collegiata sul colle
       const hill = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 8, 0, Math.PI*2, 0, Math.PI/2), mat(0x5d8a48));

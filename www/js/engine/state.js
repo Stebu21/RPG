@@ -1,6 +1,7 @@
 // Stato di gioco e regole di crescita.
 import { CHARACTERS, MAX_LEVEL, PARTY_MAX } from '../data/characters.js';
 import { ABILITIES } from '../data/abilities.js';
+import { EQUIP, ATTRS, POINTS_PER_LEVEL, SLOTS_EQ } from '../data/equipment.js';
 
 export const G = {
   account: null,   // nome account loggato
@@ -13,7 +14,7 @@ export function expToNext(level){ return Math.floor(20 * level * level); }
 export function statsOf(cs){
   const def = CHARACTERS[cs.id];
   const lv = cs.level - 1;
-  return {
+  const st = {
     hp:  Math.floor(def.base.hp  + def.growth.hp  * lv),
     mp:  Math.floor(def.base.mp  + def.growth.mp  * lv),
     atk: Math.floor(def.base.atk + def.growth.atk * lv),
@@ -21,11 +22,22 @@ export function statsOf(cs){
     mag: Math.floor(def.base.mag + def.growth.mag * lv),
     spr: Math.floor(def.base.spr + def.growth.spr * lv),
     spd: Math.floor(def.base.spd + def.growth.spd * lv),
+    crit: 0,
   };
+  // caratteristiche D&D assegnate dal giocatore
+  for (const [k, n] of Object.entries(cs.attr || {})) for (const [stat, v] of Object.entries(ATTRS[k].bonus)) st[stat] += v * n;
+  // equipaggiamento
+  for (const slot of SLOTS_EQ){
+    const e = EQUIP[cs.eq?.[slot]];
+    if (e) for (const [stat, v] of Object.entries(e.stats)) st[stat] += v;
+  }
+  return st;
 }
 
 export function knownAbilities(cs){
-  return CHARACTERS[cs.id].learnset.filter(l => l.lv <= cs.level).map(l => l.ab);
+  const lv = CHARACTERS[cs.id].learnset.filter(l => l.lv <= cs.level).map(l => l.ab);
+  const extra = (cs.tomes || []).filter(ab => !lv.includes(ab));   // apprese dai tomi
+  return [...lv, ...extra];
 }
 
 // Aggiunge exp; ritorna { levels:n, learned:[abilityId] }
@@ -37,6 +49,7 @@ export function gainExp(cs, amount){
     cs.exp -= expToNext(cs.level);
     cs.level++;
     res.levels++;
+    cs.pts = (cs.pts || 0) + POINTS_PER_LEVEL;
     for (const l of CHARACTERS[cs.id].learnset){
       if (l.lv === cs.level) res.learned.push(l.ab);
     }
@@ -49,7 +62,7 @@ export function gainExp(cs, amount){
 }
 
 function newChar(id, level=1){
-  const cs = { id, level, exp:0, hp:0, mp:0 };
+  const cs = { id, level, exp:0, hp:0, mp:0, pts:POINTS_PER_LEVEL * (level - 1), attr:{}, eq:{}, tomes:[] };
   const st = statsOf(cs);
   cs.hp = st.hp; cs.mp = st.mp;
   return cs;
@@ -69,9 +82,29 @@ export function ensureDuo(s){
   s.reserve = others.filter(id=>!s.party.includes(id));
 }
 
+// porta i salvataggi vecchi al formato attuale (caratteristiche, equipaggiamento)
+export function migrate(s){
+  s.gear ||= {};
+  for (const cs of Object.values(s.chars)){
+    if (!cs.attr){ cs.attr = {}; cs.pts = POINTS_PER_LEVEL * (cs.level - 1); }
+    cs.eq ||= {}; cs.tomes ||= [];
+  }
+  ensureDuo(s);
+}
+
 export function newGame(hero='ste'){
+  const s = newGameState(hero);
+  // equipaggiamento iniziale del duo
+  s.chars.ste.eq = { arma:'bastone_betulla', abito:'tunica_allievo' };
+  s.chars.riki.eq = { arma:'katana_acciaio', abito:'gi_rinforzato' };
+  for (const cs of Object.values(s.chars)){ const st = statsOf(cs); cs.hp = st.hp; cs.mp = st.mp; }
+  return s;
+}
+
+function newGameState(hero){
   return {
-    version: 3,
+    version: 4,
+    gear: {},
     hero,
     party: [hero, partnerOf(hero)],
     reserve: [],
@@ -105,6 +138,23 @@ export function fullHeal(){
     const cs = s.chars[id];
     const st = statsOf(cs);
     cs.hp = st.hp; cs.mp = st.mp;
+  }
+}
+
+// Recupero naturale fuori dalla battaglia: una piccola percentuale dei
+// massimi al secondo (chi è KO resta KO fino a una locanda o una Coda di Fenice).
+export const REGEN = { hp:0.012, mp:0.015 };   // frazione dei massimi al secondo
+const regenAcc = new Map();
+export function regen(s, seconds){
+  for (const cs of Object.values(s.chars)){
+    if (cs.hp <= 0) continue;
+    const st = statsOf(cs);
+    const acc = regenAcc.get(cs) || { hp:0, mp:0 };
+    acc.hp += st.hp * REGEN.hp * seconds; acc.mp += st.mp * REGEN.mp * seconds;
+    const dh = Math.floor(acc.hp), dm = Math.floor(acc.mp);
+    acc.hp -= dh; acc.mp -= dm;
+    cs.hp = Math.min(st.hp, cs.hp + dh); cs.mp = Math.min(st.mp, cs.mp + dm);
+    regenAcc.set(cs, acc);
   }
 }
 

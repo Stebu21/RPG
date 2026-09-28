@@ -16,12 +16,39 @@ export const ITEMS = {
   bici:         { name:'Bicicletta', desc:'Usala dal menu per pedalare veloce (non negli interni).', price:800, type:'key' },
 };
 
+// Negozi per paese, divisi per reparto come in Final Fantasy. Più si va a sud
+// nella storia (Vedano -> Castiglione -> Jerago -> Samarate) più la merce è forte.
 export const SHOPS = {
-  varese:      ['pozione','etere','antidoto','campana','scarpe'],
-  vedano:      ['pozione','etere','antidoto','campana'],
-  castiglione: ['pozione','granpozione','etere','coda_fenice','antidoto','campana'],
-  jerago:      ['pozione','granpozione','etere','coda_fenice','antidoto','campana'],
-  samarate:    ['granpozione','elisir','etere','coda_fenice','antidoto','campana','bici'],
+  varese: {
+    oggetti:['pozione','etere','antidoto','campana','scarpe'],
+    armi:['bastone_betulla','katana_acciaio','revolver','bende_monaco','aspersorio','arco_frassino','ascia_cavatore','flauto_osso'],
+    abiti:['tunica_allievo','gi_rinforzato','corazza_cuoio','anello_forza','amuleto_saggio'],
+    magie:['tomo_fiamma','rotolo_iaijutsu'],
+  },
+  vedano: {
+    oggetti:['pozione','etere','antidoto','campana'],
+    armi:['bastone_betulla','katana_acciaio','revolver','arco_frassino'],
+    abiti:['tunica_allievo','gi_rinforzato','stivali_vento'],
+    magie:['tomo_fiamma','tomo_gelo','rotolo_iaijutsu','manuale_spine'],
+  },
+  castiglione: {
+    oggetti:['pozione','granpozione','etere','coda_fenice','antidoto','campana'],
+    armi:['bastone_cristallo','katana_biumo','pistole_gemelle','artigli_tigre','bastone_aurora','arco_quercia'],
+    abiti:['mantello_arcano','haori_samurai','corazza_ferro','ciondolo_vita','stivali_vento'],
+    magie:['tomo_gelo','tomo_folgore','rotolo_vento','tomo_benedizione','manuale_calcio'],
+  },
+  jerago: {
+    oggetti:['pozione','granpozione','etere','coda_fenice','antidoto','campana'],
+    armi:['bastone_cristallo','katana_biumo','ascia_titano','arpa_lago','pistole_gemelle'],
+    abiti:['mantello_arcano','haori_samurai','corazza_ferro','ciondolo_vita','anello_forza','amuleto_saggio'],
+    magie:['tomo_folgore','rotolo_vento','spartito_ninna','manuale_urlo','tomo_curara'],
+  },
+  samarate: {
+    oggetti:['granpozione','elisir','etere','coda_fenice','antidoto','campana','bici'],
+    armi:['scettro_ore','masamune','ascia_titano','arpa_lago','bastone_aurora','arco_quercia'],
+    abiti:['veste_astrale','armatura_shura','corazza_ferro','medaglia_eroe','ciondolo_vita'],
+    magie:['tomo_incendio','rotolo_lune','tomo_curara','manuale_raffica'],
+  },
 };
 
 export const INN_PRICES = { varese:15, vedano:20, castiglione:30, jerago:40, samarate:50 };

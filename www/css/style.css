@@ -118,6 +118,17 @@ html, body {
 .hero-card canvas { width:84px; height:84px; border-radius:10px; }
 .hero-card b { font-size:16px; letter-spacing:1px; }
 #cmd-list .combo-cmd:not(:disabled) { background:linear-gradient(90deg, rgba(126,87,255,.45), rgba(231,76,60,.45)); }
+#autosave-toast { position:absolute; right:14px; bottom:14px; z-index:30; padding:6px 12px; border-radius:10px;
+  background:rgba(10,12,30,.75); color:#cfe3ff; font-size:12px; animation:toastfade 2.2s forwards; pointer-events:none; }
+@keyframes toastfade { 0% { opacity:0; transform:translateY(8px); } 12%,75% { opacity:1; transform:none; } 100% { opacity:0; } }
+.attr-box { margin-top:10px; }
+.attr-box h3 small { font-weight:400; color:#ffd76a; font-size:11px; }
+.attr-row { display:flex; align-items:center; gap:8px; padding:4px 6px; border-radius:8px; background:rgba(255,255,255,.04); margin-top:4px; font-size:12px; }
+.attr-row b { width:78px; color:#ffd76a; }
+.attr-row span { flex:1; }
+.attr-row span small { display:block; color:#9ab; font-size:10px; }
+.attr-row em { font-style:normal; font-weight:700; width:22px; text-align:right; }
+.attr-row .btn { padding:4px 10px; min-width:0; }
 .hero-card small { font-size:11px; opacity:.8; line-height:1.35; }
 .save-slot small { color:var(--text-dim); display:block; }
 
@@ -354,3 +365,4 @@ html, body {
   #menu-main { height:96vh; }
   #battle-commands { max-height:40vh; }
 }
+#choice-box button small { display:block; font-size:10px; opacity:.8; font-weight:400; margin-top:2px; }

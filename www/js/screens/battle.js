@@ -171,11 +171,14 @@ const BATTLE_BGS = {
     bgClouds(x, W, H, t, 'rgba(255,255,255,.7)');
     ridge(x, W, H, 0.38, '#5d8a68', 0.05);
     ridge(x, W, H, 0.48, '#41694a', 0.04);
-    // la filanda sull'Olona: capannone e ciminiera
-    x.fillStyle = 'rgba(105,80,70,.75)';
-    x.fillRect(W*0.68, H*0.50, W*0.16, H*0.12);
-    x.beginPath(); x.moveTo(W*0.68, H*0.50); x.lineTo(W*0.76, H*0.44); x.lineTo(W*0.84, H*0.50); x.closePath(); x.fill();
-    x.fillRect(W*0.86, H*0.36, W*0.02, H*0.26);
+    // la Chiesa del Lazzaretto sull'Olona: facciata a capanna e campanile a vela
+    x.fillStyle = 'rgba(120,112,100,.8)';
+    x.fillRect(W*0.68, H*0.50, W*0.14, H*0.12);
+    x.beginPath(); x.moveTo(W*0.67, H*0.50); x.lineTo(W*0.75, H*0.43); x.lineTo(W*0.83, H*0.50); x.closePath(); x.fill();
+    x.fillRect(W*0.735, H*0.38, W*0.03, H*0.06);
+    x.fillStyle = 'rgba(40,36,34,.6)';
+    x.beginPath(); x.arc(W*0.75, H*0.405, W*0.007, 0, Math.PI*2); x.fill();          // la campana
+    x.fillRect(W*0.743, H*0.55, W*0.014, H*0.07);                                    // il portale
     bgGround(x, W, H, '#4d8a44', '#26461f');
     // il fiume attraversa il campo
     x.fillStyle = 'rgba(70,140,190,.75)';
@@ -318,7 +321,7 @@ function computeDamage(user, target, move){
   const em = target.kind==='enemy' ? elemMult(target.def, move.element) : 1;
   let dmg, crit = false;
   if (move.type === 'phys'){
-    crit = Math.random() < (move.crit || 0.06);
+    crit = Math.random() < (move.crit || 0.06) + (user.kind === 'ally' ? user.st.crit || 0 : 0);
     dmg = (uAtk * buffMult(user,'atk') * 2.2 + (move.power||0) * 1.8) * v * em * (crit ? 1.8 : 1) - tDef * 1.4;
   } else {
     dmg = (uMag * buffMult(user,'atk') * 2.2 + (move.power||0) * 1.8) * v * em - tSpr * 1.2;
@@ -988,7 +991,7 @@ function victory(){
     if (cs.hp <= 0) continue;
     const res = gainExp(cs, exp);
     if (res.levels > 0){
-      lines.push(`${CHARACTERS[id].name} sale al livello ${cs.level}!`);
+      lines.push(`${CHARACTERS[id].name} sale al livello ${cs.level}! ✦ +${res.levels * 2} punti caratteristica`);
       for (const ab of res.learned) lines.push(`✨ ${CHARACTERS[id].name} impara ${abilityName(ab)}!`);
       sfx('levelup');
     }
