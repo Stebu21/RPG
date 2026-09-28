@@ -71,8 +71,7 @@ for (let i=0; i<60 && !used; i++){
   });
 }
 assert.ok(used, 'combo mai disponibile');
-await wait(400);
-await page.screenshot({ path:'tools/duo-combo.png' });
+for (const [ms, n] of [[250,1],[350,2],[450,3]]){ await wait(ms); await page.screenshot({ path:`tools/duo-combo${n}.png` }); }
 const logTxt = await page.$eval('#battle-log', e=>e.textContent);
 console.log('log:', logTxt);
 assert.match(logTxt, /COMBO|vinto|Vittoria|EXP/i);

@@ -7,14 +7,14 @@ import { ABILITIES, STATUS_NAMES, COMBOS } from '../data/abilities.js';
 import { CHARACTERS } from '../data/characters.js';
 import { ITEMS } from '../data/items.js';
 import { G, statsOf, knownAbilities, gainExp, abilityName, DUO } from '../engine/state.js';
-import { drawMonster, drawActor, TILE } from '../engine/sprites.js';
+import { BattleStage } from '../engine/battle3d.js';
 import { playMusic, stopMusic, sfx } from '../engine/audio.js';
 import { registerScreen, show, currentScreen } from '../engine/ui.js';
 
 const el = document.getElementById('screen-battle');
 const zone = document.getElementById('battle-zone');
 const canvas = document.getElementById('battle-canvas');
-const sceneCtx = canvas.getContext('2d');
+let stage = null;   // palco 3D, creato alla prima battaglia
 const popsEl = document.getElementById('battle-pops');
 const logEl = document.getElementById('battle-log');
 const cmdPanel = document.getElementById('battle-commands');
@@ -85,45 +85,20 @@ const A_LAYOUT = {
 
 function buildScene(){
   const W = zone.clientWidth || 800, H = zone.clientHeight || 360;
-  // risoluzione interna dimezzata + upscale pixelato = look da Nintendo DS
-  const dpr = 0.5;
-  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
-  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-  sceneCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  sceneCtx.imageSmoothingEnabled = false;
   B.W = W; B.H = H;
-
-  const eLay = E_LAYOUT[Math.min(4, B.enemies.length)] || E_LAYOUT[4];
-  B.enemies.forEach((e, i)=>{
-    const [fx, fy] = e.def.boss ? [0.24, 0.72] : eLay[i % eLay.length];
-    e.sx = W * fx; e.sy = H * fy;
-    e.size = e.def.boss ? Math.min(H * 0.72, 280) : Math.min(H * 0.42, 170);
-    refreshEnemySprite(e);
-  });
-  const aLay = A_LAYOUT[Math.min(3, B.allies.length)] || A_LAYOUT[3];
-  B.allies.forEach((a, i)=>{
-    const [fx, fy] = aLay[i % aLay.length];
-    a.sx = W * fx; a.sy = H * fy;
-    a.size = Math.min(H * 0.34, 120);
-  });
-}
-
-function refreshEnemySprite(e){
-  const cv = document.createElement('canvas');
-  drawMonster(cv, { sprite: e.def.sprite, pal: e.pal }, Math.ceil(e.size / 18) + 2);
-  e.sprite = cv;
+  if (!stage) stage = new BattleStage(canvas);
+  stage.resize(W, H);
+  stage.setup(B, (x, w, h, t)=>(BATTLE_BGS[B.area] || BATTLE_BGS.varese)(x, w, h, t));
 }
 
 function animate(u, kind, target){
   if (kind === 'lunge'){ u.lungeT = 0.42; }
   else if (kind === 'dash' && target){
     // corsa verso il bersaglio in stile FF9: vai, colpisci, torna
-    u.dashT = 0.72; u.dashDur = 0.72;
-    const side = u.kind === 'ally' ? 1 : -1;
-    u.dashGoal = { x: target.sx + side * target.size * 0.55 - u.sx,
-                   y: target.sy - u.sy };
+    u.dashT = 0.72; u.dashDur = 0.72; u.dashTarget = target;
+    stage?.focus(u, target, 1, 0.9);
   }
-  else if (kind === 'hit'){ u.shakeT = 0.34; u.flashT = 0.26; }
+  else if (kind === 'hit'){ u.shakeT = 0.34; u.flashT = 0.26; if (stage) stage.cam.shake = Math.max(stage.cam.shake, 0.35); }
   else if (kind === 'cast'){ u.castT = 0.55; }
 }
 
@@ -281,66 +256,18 @@ const BATTLE_BGS = {
 };
 
 function drawScene(ts, dt){
-  if (!B) return;
-  const x = sceneCtx, W = B.W, H = B.H;
+  if (!B || !stage?.B) return;
   const t = ts / 1000;
-
-  // sfondo a tema con la zona della provincia in cui si combatte
-  (BATTLE_BGS[B.area] || BATTLE_BGS.varese)(x, W, H, t);
-  if (B.boss){
-    // vignettatura minacciosa per i boss
-    const vg = x.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.95);
-    vg.addColorStop(0, 'rgba(40,0,20,0)');
-    vg.addColorStop(1, 'rgba(40,0,25,.55)');
-    x.fillStyle = vg;
-    x.fillRect(0, 0, W, H);
-  }
-
-  // aggiorna animazioni
   for (const u of [...B.enemies, ...B.allies]){
     u.lungeT = Math.max(0, u.lungeT - dt);
     u.shakeT = Math.max(0, u.shakeT - dt);
     u.flashT = Math.max(0, u.flashT - dt);
     u.castT = Math.max(0, u.castT - dt);
     u.dashT = Math.max(0, (u.dashT || 0) - dt);
-    const dead = u.kind === 'enemy' ? u.hp <= 0 : u.cs.hp <= 0;
-    if (u.kind === 'enemy'){
-      u.deadT = dead ? Math.min(1, u.deadT + dt * 1.6) : 0;
-    }
-    if (u.dashT > 0 && u.dashGoal){
-      // corsa verso il bersaglio: accelerazione, colpo, ritorno
-      const p = 1 - u.dashT / u.dashDur;
-      let k;
-      if (p < 0.38) k = 1 - Math.pow(1 - p/0.38, 2);
-      else if (p < 0.58) k = 1;
-      else k = 1 - Math.pow((p - 0.58)/0.42, 1.6);
-      u.ox = u.dashGoal.x * k + (u.shakeT > 0 ? (Math.random()*2-1) * u.shakeT * 22 : 0);
-      u.oy = u.dashGoal.y * k - Math.sin(Math.min(1, p/0.38) * Math.PI) * 14;
-    } else {
-      const lp = u.lungeT > 0 ? Math.sin((1 - u.lungeT/0.42) * Math.PI) : 0;
-      u.ox = u.lungeDir * lp * Math.min(60, B.W*0.07)
-           + (u.shakeT > 0 ? (Math.random()*2-1) * u.shakeT * 22 : 0);
-      u.oy = 0;
-    }
+    if (u.kind === 'enemy') u.deadT = u.hp <= 0 ? Math.min(1, u.deadT + dt * 1.2) : 0;
   }
-
-  // selezione bersaglio attiva?
   const selT = B.targetMode ? targetPool()[B.targetIdx % Math.max(1, targetPool().length)] : null;
-
-  // nemici (ordinati per y per una prospettiva corretta)
-  const units = [...B.enemies, ...B.allies].sort((a,b)=>a.sy - b.sy);
-  for (const u of units){
-    if (u.kind === 'enemy') drawEnemyUnit(x, u, t, selT === u);
-    else drawAllyUnit(x, u, t, selT === u);
-  }
-
-  // scintille degli incantesimi sopra a tutto
-  for (const u of units){
-    if (u.castT > 0) drawCast(x, u, t);
-  }
-
-  // effetti speciali (proiettili magici, fulmini, fendenti, cure)
-  updateFx(x, dt, t);
+  stage.frame(dt, t, selT);
 }
 
 // ---------- effetti speciali delle mosse ----------
@@ -349,195 +276,16 @@ const ELEM_FX = {
   vento:'#a8f0c0', terra:'#d0a05a', sacro:'#fff2b0', oscurita:'#b06ae8', neutro:'#cfd8ff',
 };
 
-function spawnFx(fx){ B?.fx?.push({ t:0, ...fx }); }
+// gli effetti vivono nel palco 3D: qui solo lo smistamento per tipo
+function spawnFx(fx){
+  if (!stage || !fx.unit) return;
+  if (fx.kind === 'slash') stage.slash(fx.unit, fx.color);
+  else if (fx.kind === 'heal') stage.heal(fx.unit, fx.color);
+}
 
 function fxForSpell(user, target, element){
-  const color = ELEM_FX[element] || ELEM_FX.neutro;
-  const ty = target.sy - target.size*0.5;
-  if (element === 'tuono'){
-    spawnFx({ kind:'bolt', x1:target.sx, y1:ty + target.size*0.1, dur:0.30, color });
-  } else {
-    spawnFx({ kind:'proj', x0:user.sx + user.ox, y0:user.sy - user.size*0.55,
-              x1:target.sx, y1:ty, dur:0.34, color });
-  }
-  spawnFx({ kind:'burst', x1:target.sx, y1:ty, dur:0.5, delay:0.32, color });
-}
-
-function updateFx(x, dt, t){
-  if (!B.fx) return;
-  for (const f of B.fx) f.t += dt;
-  B.fx = B.fx.filter(f=>f.t < (f.delay||0) + f.dur);
-  x.save();
-  x.globalCompositeOperation = 'lighter';
-  for (const f of B.fx){
-    const lt = f.t - (f.delay||0);
-    if (lt < 0) continue;
-    const p = Math.min(1, lt / f.dur);
-    if (f.kind === 'proj'){
-      const px = f.x0 + (f.x1-f.x0)*p;
-      const py = f.y0 + (f.y1-f.y0)*p - Math.sin(p*Math.PI)*46;
-      x.shadowColor = f.color; x.shadowBlur = 14;
-      x.fillStyle = f.color;
-      x.beginPath(); x.arc(px, py, 6, 0, Math.PI*2); x.fill();
-      // scia
-      for (let i=1; i<=4; i++){
-        const q = Math.max(0, p - i*0.05);
-        const qx = f.x0 + (f.x1-f.x0)*q;
-        const qy = f.y0 + (f.y1-f.y0)*q - Math.sin(q*Math.PI)*46;
-        x.globalAlpha = 0.5 - i*0.11;
-        x.beginPath(); x.arc(qx, qy, 5 - i, 0, Math.PI*2); x.fill();
-      }
-      x.globalAlpha = 1;
-    } else if (f.kind === 'bolt'){
-      x.strokeStyle = f.color; x.lineWidth = 3.5;
-      x.shadowColor = f.color; x.shadowBlur = 16;
-      x.globalAlpha = p < 0.15 ? p/0.15 : 1 - (p-0.15)/0.85;
-      x.beginPath();
-      let by = -10, bx = f.x1 + 30;
-      x.moveTo(bx, by);
-      while (by < f.y1){
-        by += 22 + Math.random()*14;
-        bx = f.x1 + (Math.random()*2-1) * 22 * Math.max(0.1, (f.y1-by)/f.y1);
-        x.lineTo(bx, Math.min(by, f.y1));
-      }
-      x.stroke();
-      x.globalAlpha = 1;
-    } else if (f.kind === 'burst'){
-      for (let i=0; i<10; i++){
-        const a = i/10 * Math.PI*2 + (f.x1%7);
-        const r = p * 34;
-        x.globalAlpha = (1-p) * 0.9;
-        x.fillStyle = f.color;
-        x.beginPath();
-        x.arc(f.x1 + Math.cos(a)*r, f.y1 + Math.sin(a)*r*0.7 - p*10, 3.4*(1-p)+0.8, 0, Math.PI*2);
-        x.fill();
-      }
-      x.globalAlpha = 1;
-    } else if (f.kind === 'slash'){
-      // fendente ad arco
-      x.strokeStyle = '#fff';
-      x.shadowColor = f.color || '#fff'; x.shadowBlur = 12;
-      x.lineWidth = 4 * (1-p) + 1;
-      x.globalAlpha = 1 - p;
-      const a0 = -Math.PI*0.85 + p*1.2, a1 = a0 + Math.PI*0.75;
-      x.beginPath(); x.arc(f.x1, f.y1, 30 + p*14, a0, a1); x.stroke();
-      x.globalAlpha = 1;
-    } else if (f.kind === 'heal'){
-      for (let i=0; i<7; i++){
-        const q = (p + i/7) % 1;
-        const hx = f.x1 + Math.sin(i*2.7 + p*6) * 18;
-        const hy = f.y1 + 20 - q*54;
-        x.globalAlpha = (1-q) * 0.8;
-        x.fillStyle = f.color || '#a0ffb8';
-        x.beginPath(); x.arc(hx, hy, 2.6, 0, Math.PI*2); x.fill();
-        // crocetta di luce
-        x.fillRect(hx-4, hy-0.8, 8, 1.6);
-        x.fillRect(hx-0.8, hy-4, 1.6, 8);
-      }
-      x.globalAlpha = 1;
-    }
-  }
-  x.restore();
-}
-
-function drawTargetRing(x, u, t){
-  const w = u.kind === 'enemy' ? u.size*0.45 : u.size*0.42;
-  x.save();
-  x.strokeStyle = '#ffd76a';
-  x.lineWidth = 3;
-  x.shadowColor = '#ffd76a'; x.shadowBlur = 10;
-  x.globalAlpha = 0.7 + Math.sin(t*7)*0.3;
-  x.beginPath(); x.ellipse(u.sx + u.ox, u.sy + 4, w, w*0.3, 0, 0, Math.PI*2); x.stroke();
-  // freccia
-  const ay = u.sy - u.size - 14 + Math.sin(t*6)*4;
-  x.fillStyle = '#ffd76a';
-  x.beginPath(); x.moveTo(u.sx-8, ay); x.lineTo(u.sx+8, ay); x.lineTo(u.sx, ay+10); x.closePath(); x.fill();
-  x.restore();
-}
-
-function drawEnemyUnit(x, e, t, selected){
-  if (e.deadT >= 1) return;
-  const bob = e.hp > 0 ? Math.sin(t*1.8 + e.idx*1.4) * 3 : 0;
-  if (selected) drawTargetRing(x, e, t);
-  x.save();
-  x.globalAlpha = 1 - e.deadT;
-  const dy = e.deadT * 24 + (e.oy || 0);
-  x.drawImage(e.sprite, e.sx + e.ox - e.size/2, e.sy + bob + dy - e.size*0.92, e.size, e.size);
-  if (e.flashT > 0){
-    x.globalCompositeOperation = 'lighter';
-    x.globalAlpha = e.flashT * 2.4;
-    x.fillStyle = '#fff';
-    x.beginPath(); x.ellipse(e.sx + e.ox, e.sy + bob - e.size*0.45, e.size*0.4, e.size*0.42, 0, 0, Math.PI*2); x.fill();
-  }
-  x.restore();
-  if (e.hp > 0){
-    // nome + barra HP
-    const bw = Math.max(64, e.size*0.6);
-    const bx = e.sx - bw/2, by = e.sy + 12;
-    x.fillStyle = 'rgba(8,8,24,.65)';
-    x.beginPath(); x.roundRect(bx-6, by-15, bw+12, 26, 8); x.fill();
-    x.fillStyle = '#dfe3f5';
-    x.font = '11px system-ui, sans-serif';
-    x.textAlign = 'center';
-    x.fillText(e.name, e.sx, by-4);
-    x.fillStyle = 'rgba(255,255,255,.16)';
-    x.beginPath(); x.roundRect(bx, by, bw, 5, 3); x.fill();
-    const pct = Math.max(0, e.hp/e.maxhp);
-    x.fillStyle = pct < 0.25 ? '#e74c3c' : pct < 0.5 ? '#f1b13c' : '#46c46e';
-    x.beginPath(); x.roundRect(bx, by, bw*pct, 5, 3); x.fill();
-  }
-}
-
-function drawAllyUnit(x, a, t, selected){
-  const ko = a.cs.hp <= 0;
-  const limitOk = !ko && a.cs.hp / a.st.hp < 0.3;
-  const active = B.readyQueue[0] === a;
-  if (selected) drawTargetRing(x, a, t);
-  // aura Limit
-  if (limitOk){
-    x.save();
-    x.globalAlpha = 0.35 + Math.sin(t*6)*0.15;
-    x.fillStyle = '#ff6b81';
-    x.beginPath(); x.ellipse(a.sx + a.ox, a.sy + 3, a.size*0.34, a.size*0.12, 0, 0, Math.PI*2); x.fill();
-    x.restore();
-  }
-  const breathe = ko ? 0
-    : B.victory ? -Math.abs(Math.sin(t*5 + a.sy)) * 8       // saltello di vittoria
-    : Math.sin(t*2.2 + a.sy) * 1.6;
-  const s = a.size / 64; // drawActor è alto ~64px in scala TILE
-  x.save();
-  x.translate(a.sx + a.ox, a.sy + breathe + (a.oy || 0));
-  if (a.flashT > 0) x.globalAlpha = 0.5 + Math.sin(t*60)*0.5;
-  if (ko){
-    x.globalAlpha = 0.45;
-    x.rotate(-Math.PI/2);
-    x.translate(0, 6);
-  }
-  x.scale(s, s);
-  drawActor(x, -TILE/2, -46, a.def, 'left', ko ? 0 : (a.lungeT > 0 || a.dashT > 0 ? (t*3)%1 : 0));
-  x.restore();
-  // indicatore del turno attivo
-  if (active && !ko){
-    const ay = a.sy - a.size - 10 + Math.sin(t*5)*3;
-    x.fillStyle = '#7ec8ff';
-    x.beginPath(); x.moveTo(a.sx-7, ay); x.lineTo(a.sx+7, ay); x.lineTo(a.sx, ay+9); x.closePath(); x.fill();
-  }
-}
-
-function drawCast(x, u, t){
-  const n = 7;
-  x.save();
-  x.globalCompositeOperation = 'lighter';
-  for (let i=0; i<n; i++){
-    const a = t*5 + i * (Math.PI*2/n);
-    const r = u.size*0.4 * (1 - u.castT/0.55) + 8;
-    const px = u.sx + Math.cos(a) * r;
-    const py = u.sy - u.size*0.5 + Math.sin(a) * r * 0.5 - (1 - u.castT/0.55) * 22;
-    x.fillStyle = `rgba(160,200,255,${u.castT})`;
-    x.shadowColor = '#9ec8ff'; x.shadowBlur = 8;
-    x.beginPath(); x.arc(px, py, 3, 0, Math.PI*2); x.fill();
-  }
-  x.restore();
+  stage?.spell(user, target, element);
+  if (user.kind === 'ally') stage?.focus(user, target, 0.6, 0.8);
 }
 
 function sceneLoop(ts){
@@ -582,6 +330,7 @@ function computeDamage(user, target, move){
 
 // ---------- effetti visivi ----------
 function popDamage(unit, text, cls=''){
+  if (cls === 'crit') stage?.hitStop(0.14);
   if (!unit || unit.sx === undefined) return;
   const d = document.createElement('div');
   d.className = 'dmg-pop ' + cls;
@@ -766,6 +515,7 @@ function execCombo(a, mate, c, targets, done){
   ste.cs.mp -= c.mp.ste; riki.cs.mp -= c.mp.riki;
   tickStatusesOnAct(a);
   sfx('limit'); flash('rgba(160,120,255,.45)');
+  stage?.focus(ste, targets[0], 1.5, 1.6);
   log(`COMBO! Ste e Riki: ${c.name}!`);
   animate(ste, 'cast');
   for (const t of targets) fxForSpell(ste, t, c.element);
@@ -785,7 +535,7 @@ function execCombo(a, mate, c, targets, done){
       }
       applyDamage(t, total);
       animate(t, 'hit');
-      spawnFx({ kind:'slash', x1:t.sx, y1:t.sy - t.size*0.5, dur:0.35, color: ELEM_FX[c.element] || '#fff' });
+      spawnFx({ kind:'slash', unit:t, dur:0.35, color: ELEM_FX[c.element] || '#fff' });
       popDamage(t, total, anyCrit ? 'crit' : '');
     }
     updatePartyBars();
@@ -990,7 +740,7 @@ function execAbility(user, abId, targets, done){
   tickStatusesOnAct(user);
   if (user.kind === 'ally' && user.cs.hp <= 0){ done(); return; } // morto di veleno
   const userName = user.name;
-  if (ab.limit){ sfx('limit'); flash('rgba(255,120,160,.5)'); }
+  if (ab.limit){ sfx('limit'); flash('rgba(255,120,160,.5)'); stage?.focus(user, targets[0], 1.4, 1.4); }
   log(abId === 'attacco' ? `${userName} attacca!` : `${userName} usa ${ab.name}!`);
   const singleFoe = targets.length === 1 && targets[0] !== user;
   if (ab.type === 'phys' || ab.type === 'steal'){
@@ -1003,7 +753,7 @@ function execAbility(user, abId, targets, done){
     for (const t of targets) fxForSpell(user, t, ab.element);
   } else if (['heal','healall','revive','buff'].includes(ab.type)){
     for (const t of targets){
-      spawnFx({ kind:'heal', x1:t.sx, y1:t.sy - t.size*0.5, dur:0.8,
+      spawnFx({ kind:'heal', unit:t, dur:0.8,
                 color: ab.type === 'buff' ? '#ffd76a' : '#a0ffb8' });
     }
   }
@@ -1023,7 +773,7 @@ function execAbility(user, abId, targets, done){
         applyDamage(t, total);
         animate(t, 'hit');
         if (ab.type !== 'mag'){
-          spawnFx({ kind:'slash', x1:t.sx, y1:t.sy - t.size*0.5, dur:0.30,
+          spawnFx({ kind:'slash', unit:t, dur:0.30,
                     color: ELEM_FX[ab.element] || '#fff' });
         }
         popDamage(t, total, anyCrit ? 'crit' : '');
@@ -1149,7 +899,7 @@ function enemyAct(e, done){
         applyDamage(t, dmg);
         animate(t, 'hit');
         if (move.type === 'phys'){
-          spawnFx({ kind:'slash', x1:t.sx, y1:t.sy - t.size*0.5, dur:0.30,
+          spawnFx({ kind:'slash', unit:t, dur:0.30,
                     color: ELEM_FX[move.element] || '#fff' });
         }
         if (move.status && Math.random() < move.status.chance) t.statuses[move.status.id] = true;

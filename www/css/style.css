@@ -222,11 +222,13 @@ html, body {
 /* ---------- battaglia ---------- */
 #screen-battle { display:flex; flex-direction:column; background:#10102a; }
 #battle-zone { flex:1; position:relative; min-height:0; overflow:hidden; }
-#battle-canvas {
-  position:absolute; inset:0;
-  image-rendering:pixelated;
-  image-rendering:crisp-edges;
-}
+#battle-canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
+.enemy-tag { position:absolute; transform:translateX(-50%); background:rgba(8,8,24,.62); border-radius:8px;
+  padding:3px 8px 5px; font-size:11px; color:#dfe3f5; text-align:center; min-width:70px; backdrop-filter:blur(2px); }
+.enemy-tag span { display:block; white-space:nowrap; }
+.enemy-tag i { display:block; height:5px; border-radius:3px; background:rgba(255,255,255,.16); margin-top:3px; overflow:hidden; }
+.enemy-tag b { display:block; height:100%; border-radius:3px; transition:width .3s; }
+.dmg-pop.crit { color:var(--gold); font-size:34px; }
 #battle-pops { position:absolute; inset:0; pointer-events:none; z-index:5; }
 .dmg-pop {
   position:absolute; transform:translateX(-50%);

@@ -42,16 +42,25 @@ function newPlayer(x, y){
 // esattamente come te, senza bisogno di un pathfinding.
 const FOLLOW_GAP = 0.85;          // caselle di distanza lungo la scia
 let trail = [];                   // punti {x,z} dal più recente al più vecchio
-let follower = { x:0, z:0, walk:0, face:0, speed:0 };
+let follower = { x:0, z:0, walk:0, face:0, speed:0, idle:0 };
 function resetFollower(x, z){
   trail = [{ x, z }];
-  follower = { x, z: z - 0.6, walk:0, face:0, speed:0 };   // parte un passo dietro
+  // parte al tuo fianco, così si vede subito
+  follower = { x: x + 0.75, z, walk:0, face:0, speed:0, idle:0 };
+}
+function sideSpot(){
+  // da fermi si affianca al giocatore (a destra o a sinistra, dove c'è posto)
+  for (const sx of [0.75, -0.75]){
+    const tx = Math.floor(player.px + sx), ty = Math.floor(player.pz);
+    if (walkable(tx, ty)) return { x: player.px + sx, z: player.pz };
+  }
+  return null;
 }
 function updateFollower(dt){
   const head = trail[0];
   if (Math.hypot(player.px - head.x, player.pz - head.z) > 0.08) trail.unshift({ x:player.px, z:player.pz });
   // punto della scia a FOLLOW_GAP dal giocatore
-  let dist = Math.hypot(player.px - trail[0].x, player.pz - trail[0].z), tx = trail[0].x, tz = trail[0].z;
+  let dist = Math.hypot(player.px - trail[0].x, player.pz - trail[0].z);
   let target = null;
   for (let i = 1; i < trail.length; i++){
     const a = trail[i-1], b = trail[i];
@@ -62,14 +71,24 @@ function updateFollower(dt){
       trail.length = i + 1;          // la scia più vecchia non serve più
       break;
     }
-    dist += seg; tx = b.x; tz = b.z;
+    dist += seg;
   }
-  if (!target) return;               // il giocatore è ancora troppo vicino
+  const still = Math.hypot(player.vx, player.vz) < 0.1;
+  follower.idle = still ? follower.idle + dt : 0;
+  if (follower.idle > 0.5) target = sideSpot() || target;
+  if (!target){ follower.speed = 0; return; }
+  // si muove verso il bersaglio senza scatti, anche quando cambia modalità
   const dx = target.x - follower.x, dz = target.z - follower.z;
   const d = Math.hypot(dx, dz);
-  follower.speed = d / Math.max(dt, 1e-3);
-  if (d > 0.01){ follower.face = Math.atan2(dx, dz); follower.walk += d * 1.6; }
-  follower.x = target.x; follower.z = target.z;
+  const maxStep = Math.max(4, Math.hypot(player.vx, player.vz) * 1.4) * dt;
+  const step = Math.min(d, maxStep);
+  if (d > 0.01){
+    follower.x += dx / d * step; follower.z += dz / d * step;
+    follower.face = Math.atan2(dx, dz); follower.walk += step * 1.6;
+  } else if (follower.idle > 0.5){
+    follower.face = Math.atan2(player.px - follower.x, player.pz - follower.z) * 0.5;   // si gira verso di te e la camera
+  }
+  follower.speed = step / Math.max(dt, 1e-3);
 }
 
 // battute del compagno quando gli parli (Ctrl rivolto verso di lui)

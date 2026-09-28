@@ -526,8 +526,11 @@ export class World3D {
 
     // --- erba alta (istanziata, ondeggia al vento) ---
     const blades = [];
+    const towns = [];
+    for (let y=0; y<H; y++) for (let x=0; x<W; x++) if ('12345A'.includes(getCh(x, y))) towns.push([x, y]);
+    const nearTown = (x, y)=>towns.some(([tx, ty])=>Math.abs(tx - x) <= 2 && Math.abs(ty - y) <= 2);
     for (let y=0; y<H; y++) for (let x=0; x<W; x++){
-      const ch = getCh(x, y);
+      const ch = nearTown(x, y) ? '.' : getCh(x, y);   // niente erba alta dentro i borghi
       const n = ch === ',' ? 14 : 0;
       for (let k=0; k<n; k++) blades.push([x + hash(x*9+k,y,61), y + hash(x,y*9+k,62), ch === ',' ? 1 : 0.5]);
     }
@@ -626,8 +629,8 @@ export class World3D {
           break;
         }
         case 'W': this.tower(g, cx, cz); break;
-        case '1': case '2': case '3': case '4': case '5': this.village(g, cx, cz, x, y, false); break;
-        case 'A': this.village(g, cx, cz, x, y, true); break;
+        case '1': case '2': case '3': case '4': case '5': this.village(g, cx, cz, x, y, ch); break;
+        case 'A': this.village(g, cx, cz, x, y, 'A'); break;
         case 'S': {
           // santuario del Sacro Monte in vetta
           const gy = Math.max(0, heightAt(getCh, cx, cz));
@@ -886,25 +889,106 @@ export class World3D {
     this.animated.push({ update:t=>{ flag.rotation.y = Math.sin(t*3)*0.3; } });
   }
 
-  village(g, cx, cz, x, y, academy){
+  // Paesi sulla mappa del mondo: un piccolo borgo in miniatura attorno alla
+  // casella d'ingresso, con il monumento che lo distingue e il nome in alto.
+  village(g, cx, cz, x, y, kind){
     const T = textures();
-    const n = academy ? 1 : 4;
-    const vg = new THREE.Group(); const g0 = g; g = vg;
-    for (let i=0; i<n; i++){
-      const w = academy ? 1.2 : 0.35 + hash(x,y,100+i)*0.15, h = academy ? 0.8 : 0.3 + hash(x,y,110+i)*0.2;
-      const ox = academy ? 0 : [-0.22, 0.2, -0.15, 0.25][i], oz = academy ? 0 : [-0.2, -0.15, 0.22, 0.2][i];
-      addBox(g, w, h, w, mat([0xe8c27a, 0xf1e2c3, 0xe6a680, 0xf3d68b][i%4], { map:T.plaster }), cx+ox, h/2, cz+oz);
-      const rf = new THREE.Mesh(prismRoof(w, w, w*0.5, true), mat(0xffffff, { map:T.roof }));
-      rf.position.set(cx+ox, h, cz+oz); rf.castShadow = true; g.add(rf);
+    const vg = new THREE.Group();
+    vg.position.set(cx, 0, cz);
+    const pal = [0xe8c27a, 0xf1e2c3, 0xe6a680, 0xf3d68b, 0xd9d2bd, 0xe9b98e];
+    const house = (hx, hz, w, d, h, rot=0)=>{
+      const hg = new THREE.Group();
+      addBox(hg, w, h, d, mat(pal[(hash(x*7+hx*13|0, y*5+hz*11|0, 120)*pal.length)|0], { map:T.plaster }), 0, h/2, 0);
+      const rf = new THREE.Mesh(prismRoof(w, d, Math.min(w, d)*0.45, w >= d), mat(0xd9cfc6, { map:T.roof }));
+      rf.position.y = h; rf.castShadow = true; hg.add(rf);
+      // finestrella con persiane verdi
+      addBox(hg, w*0.25, h*0.3, 0.01, mat(0x3d6b3c), 0, h*0.55, d/2 + 0.005, false);
+      hg.position.set(hx, 0, hz); hg.rotation.y = rot;
+      vg.add(hg);
+    };
+    const tree = (tx, tz, s=1)=>{
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.03*s, 0.04*s, 0.25*s, 5), mat(0x5b3b24)); tr.position.set(tx, 0.12*s, tz);
+      const cr = new THREE.Mesh(new THREE.IcosahedronGeometry(0.17*s, 0), mat(0x3f7a34, { flatShading:true })); cr.position.set(tx, 0.36*s, tz);
+      tr.castShadow = cr.castShadow = true; vg.add(tr, cr);
+    };
+    const campanile = (bx, bz, h=1.1)=>{
+      addBox(vg, 0.18, h, 0.18, mat(0xd9d0bf, { map:T.stone }), bx, h/2, bz);
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.3, 4), mat(0xffffff, { map:T.roof }));
+      sp.position.set(bx, h + 0.15, bz); sp.rotation.y = Math.PI/4; sp.castShadow = true; vg.add(sp);
+    };
+
+    // anello di case attorno a una piazzetta, con un varco a sud per la strada
+    const nHouses = kind === '1' ? 11 : kind === 'A' ? 0 : 7;
+    for (let i=0; i<nHouses; i++){
+      const a = -Math.PI*0.35 + (i / nHouses) * Math.PI * 1.7 - Math.PI/2 + Math.PI;  // lascia libero il sud
+      const r = 0.75 + hash(x, y, 130+i) * 0.35 + (kind === '1' ? 0.25 : 0);
+      const w = 0.3 + hash(x, y, 140+i)*0.2, d = 0.28 + hash(x, y, 150+i)*0.14;
+      house(Math.cos(a)*r, Math.sin(a)*r, w, d, 0.28 + hash(x, y, 160+i)*0.18, -a + Math.PI/2);
     }
-    if (!academy){
-      addBox(g, 0.16, 0.9, 0.16, mat(0xd9d0bf, { map:T.stone }), cx+0.05, 0.45, cz);
-      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.3, 4), mat(0xffffff, { map:T.roof }));
-      sp.position.set(cx+0.05, 1.05, cz); g.add(sp);
+    for (let i=0; i<6; i++){
+      const a = hash(x, y, 170+i) * Math.PI*2, r = 1.35 + hash(x, y, 180+i) * 0.5;
+      if (Math.sin(a) > 0.6) continue;                                    // non sulla strada d'accesso
+      tree(Math.cos(a)*r, Math.sin(a)*r, 0.9 + hash(x, y, 190+i)*0.5);
     }
-    // sulla mappa del mondo i paesi sono più grandi della singola casella
-    vg.position.set(cx, 0, cz); vg.children.forEach(o=>{ o.position.x -= cx; o.position.z -= cz; });
-    vg.scale.setScalar(1.8); g0.add(vg);
+    // pavé della piazza
+    const pz = new THREE.Mesh(new THREE.CircleGeometry(0.55, 24), mat(0xb4ab9c, { roughness:1 }));
+    pz.rotation.x = -Math.PI/2; pz.position.y = 0.012; pz.receiveShadow = true; vg.add(pz);
+
+    // monumento caratteristico
+    if (kind === '1'){            // Varese: campanile del Bernascone e palazzo Estense
+      campanile(-0.1, -0.35, 1.6);
+      addBox(vg, 0.9, 0.35, 0.3, mat(0xf0d9a8, { map:T.plaster }), 0.35, 0.18, -0.55);
+    } else if (kind === '2'){     // Vedano: filanda con ciminiera sull'Olona
+      addBox(vg, 0.6, 0.3, 0.35, mat(0xffffff, { map:T.brick }), -0.75, 0.15, -0.2);
+      const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.0, 8), mat(0xffffff, { map:T.brick }));
+      ch.position.set(-0.95, 0.5, -0.3); ch.castShadow = true; vg.add(ch);
+      campanile(0.2, -0.3, 1.0);
+    } else if (kind === '3'){     // Castiglione: la Collegiata sul colle
+      const hill = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 8, 0, Math.PI*2, 0, Math.PI/2), mat(0x5d8a48));
+      hill.scale.set(1, 0.45, 1); hill.position.set(0.25, 0, -0.45); hill.receiveShadow = true; vg.add(hill);
+      addBox(vg, 0.5, 0.35, 0.3, mat(0xf2ede2, { map:T.stone }), 0.25, 0.42, -0.45);
+      campanile(0.55, -0.55, 1.3);
+    } else if (kind === '4'){     // Jerago: il castello con mastio e merli
+      addBox(vg, 0.8, 0.35, 0.6, mat(0xb9b2a4, { map:T.stone }), 0, 0.18, -0.45);
+      for (const [a, b] of [[-0.4, -0.75], [0.4, -0.75], [-0.4, -0.15], [0.4, -0.15]]){
+        const tw = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.11, 0.6, 8), mat(0xb9b2a4, { map:T.stone }));
+        tw.position.set(a, 0.3, b); tw.castShadow = true; vg.add(tw);
+      }
+      addBox(vg, 0.25, 1.0, 0.25, mat(0xb9b2a4, { map:T.stone }), 0, 0.5, -0.5);
+      const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.12), new THREE.MeshStandardMaterial({ color:0xc0392b, side:THREE.DoubleSide }));
+      fl.position.set(0.1, 1.15, -0.5); vg.add(fl);
+      this.animated.push({ update:t=>{ fl.rotation.y = Math.sin(t*3 + x)*0.4; } });
+    } else if (kind === '5'){     // Samarate: gli hangar delle officine aeronautiche
+      for (const ox of [-0.35, 0.35]){
+        const hg = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.7, 16, 1, false, 0, Math.PI), mat(0x7d8290, { metalness:0.5, roughness:0.4 }));
+        hg.rotation.set(0, 0, Math.PI/2); hg.rotation.set(Math.PI/2, 0, Math.PI/2); hg.position.set(ox, 0, -0.5);
+        hg.castShadow = true; vg.add(hg);
+      }
+      campanile(0.9, 0.1, 0.9);
+    } else if (kind === 'A'){     // l'Accademia: palazzo con cortile e torretta
+      addBox(vg, 1.3, 0.6, 0.35, mat(0xf1e2c3, { map:T.plaster }), 0, 0.3, -0.45);
+      addBox(vg, 0.35, 0.6, 0.9, mat(0xf1e2c3, { map:T.plaster }), -0.5, 0.3, 0);
+      addBox(vg, 0.35, 0.6, 0.9, mat(0xf1e2c3, { map:T.plaster }), 0.5, 0.3, 0);
+      const rf = new THREE.Mesh(prismRoof(1.3, 0.35, 0.25, true), mat(0xd9cfc6, { map:T.roof })); rf.position.set(0, 0.6, -0.45); vg.add(rf);
+      campanile(0, -0.45, 1.2);
+    }
+    vg.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+    vg.scale.setScalar(1.35);
+    g.add(vg);
+
+    // nome del paese sospeso sopra il borgo
+    const name = { '1':'Varese', '2':'Vedano Olona', '3':'Castiglione Olona', '4':'Jerago', '5':'Samarate', 'A':'Accademia' }[kind];
+    if (name){
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96;
+      const c = cv.getContext('2d');
+      c.font = 'bold 54px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.lineWidth = 10; c.strokeStyle = 'rgba(20,16,40,.85)'; c.strokeText(name, 256, 50);
+      c.fillStyle = '#ffe9a8'; c.fillText(name, 256, 50);
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false }));
+      sp.scale.set(2.6, 0.49, 1); sp.position.set(cx, 2.6, cz); sp.renderOrder = 5;
+      g.add(sp);
+    }
   }
 
   // ---------- luci giorno/notte legate all'ora reale ----------
