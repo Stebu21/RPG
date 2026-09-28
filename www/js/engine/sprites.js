@@ -998,7 +998,7 @@ export function drawObject(ctx, ch, x, y, t, tx, ty, getCh){
   }
 }
 
-export const BLOCKED = new Set(['~','^','T','#','C','W','M','K','l','Z','O','H','P',' ','G','Q','E','b','m','U']);
+export const BLOCKED = new Set(['d','~','^','T','#','C','W','M','K','l','Z','O','H','P',' ','G','Q','E','b','m','U']);
 
 // ---------- eroi e NPC sulla mappa ----------
 // `who` può essere un colore (NPC generici) oppure { color, look } di un personaggio.

@@ -236,12 +236,12 @@ function renderItemsTab(){
     const row = document.createElement('div');
     row.className = 'item-row';
     row.innerHTML = `<div><b>${it.name}</b> x${G.s.items[id]}<br><small style="color:#9ab">${it.desc}</small></div>`;
-    if (id === 'bici'){
+    if (it.vehicle){
       const use = document.createElement('button');
       use.className = 'btn';
-      use.textContent = G.s.flags.bici_on ? 'SCENDI' : 'PEDALA';
+      use.textContent = G.s.vehicle === id ? 'SCENDI' : 'SALI';
       use.onclick = ()=>{
-        G.s.flags.bici_on = !G.s.flags.bici_on;
+        G.s.vehicle = G.s.vehicle === id ? null : id;
         sfx('confirm');
         renderItemsTab();
       };

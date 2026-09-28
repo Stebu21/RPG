@@ -84,9 +84,21 @@ export const NPCS = {
       lines:['La campana del Lazzaretto ha smesso di suonare da sola. Quarant’anni che tengo le chiavi di quella chiesa, e non avevo mai sentito un silenzio così bello.',
              'A Castiglione, dicono, un ladro e una ragazza con l’arco si sono chiusi nella Collegiata. Gente strana, di questi tempi.'] },
     { name:'Vecchio Sagrestano', lines:['Voi due siete dell’Accademia? Allora ascoltate.',
-      'La Chiesa del Lazzaretto, di là dall’Olona, fu costruita per i malati della peste, secoli fa. Da quando è arrivata la nube viola, di notte la campana suona da sola.',
+      'La Chiesa del Lazzaretto, giù a est del paese, fu costruita per i malati della peste, secoli fa. Da quando è arrivata la nube viola, di notte la campana suona da sola.',
       'Dentro, la vecchia statua del guardiano si è mossa. Tiene tra le mani un sigillo che brilla come l’alba.',
-      'La porta è a ovest, oltre il ponte. Ho lasciato il chiavistello aperto: il resto è affar vostro.'] },
+      'Uscite dalla piazza di San Rocco verso est e seguite la strada tra i campi. Ho lasciato il chiavistello aperto: il resto è affar vostro.'] },
+  ],
+  vedano_passante1: [
+    { name:'Signora con la spesa', lines:['L’alimentari qui in piazza San Rocco ha il pane più buono della valle. Da quando c’è la nube viola, però, lievita al contrario.'] },
+  ],
+  vedano_passante2: [
+    { name:'Ragazzo in bici', lines:['Via Monetti di sera è tranquillissima. Se trovi un monopattino abbandonato, prendilo: io il mio l’ho perso inseguendo un Lumacone.'] },
+  ],
+  vedano_passante3: [
+    { name:'Contadino', lines:['Tra i campi verso il Lazzaretto si sente una campana anche a mezzanotte. Io giro al largo, con la zappa in mano.'] },
+  ],
+  vedano_passante4: [
+    { name:'Signore di Via Adua', lines:['Da Via Adua si sale verso Varese. C’era una Vespa parcheggiata qui da giorni: chi la trova, se la tenga... ma la tratti bene.'] },
   ],
   vedano_cittadino: [
     { name:'Cittadino', lines:['Di notte dal Lazzaretto si sentono passi di pietra. E la campana... chi la suona, se la chiesa è chiusa?'] },

@@ -85,6 +85,7 @@ export function ensureDuo(s){
 // porta i salvataggi vecchi al formato attuale (caratteristiche, equipaggiamento)
 export function migrate(s){
   s.gear ||= {};
+  if (s.flags?.bici_on){ s.vehicle = 'bici'; delete s.flags.bici_on; }   // vecchio interruttore della bici
   for (const cs of Object.values(s.chars)){
     if (!cs.attr){ cs.attr = {}; cs.pts = POINTS_PER_LEVEL * (cs.level - 1); }
     cs.eq ||= {}; cs.tomes ||= [];

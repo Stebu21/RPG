@@ -12,6 +12,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildEnvironment, areaTint } from './battleEnv.js';
+import { MOBILE_ZOOM } from './world3d.js';
 import { Person } from './character3d.js';
 import { drawMonster } from './sprites.js';
 
@@ -524,7 +525,8 @@ export class BattleStage {
 
   updateCamera(dt, t){
     const c = this.cam;
-    const base = new THREE.Vector3(2.4 + Math.sin(t*0.25)*0.35, 2.1, 6.0);
+    const mz = MOBILE_ZOOM();   // su telefono l'arena si vede per intero
+    const base = new THREE.Vector3(2.4 + Math.sin(t*0.25)*0.35, 2.1 * (1 + (mz - 1) * 0.8), 6.0 * mz);
     let look = new THREE.Vector3(-0.1, 1.1, 0);
     let pos = base;
     if (c.intro > 0){ c.intro -= dt; }

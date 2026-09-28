@@ -77,11 +77,11 @@ await wait(600);
 await page.screenshot({ path: `tools/3d-closeup${tag}.png` });
 await page.evaluate(()=>{ window.__closeup = false; });
 // in bici lungo la via
-await page.evaluate(async ()=>{ const { G } = await import('./js/engine/state.js'); G.s.items.bici = 1; G.s.flags.bici_on = true; });
+await page.evaluate(async ()=>{ const { G } = await import('./js/engine/state.js'); G.s.items.bici = 1; G.s.vehicle = 'bici'; });
 await go('vedano', 13, 16);
 await page.keyboard.down('ArrowUp'); await wait(700); await page.keyboard.up('ArrowUp'); await wait(100);
 await page.screenshot({ path: `tools/3d-bici${tag}.png` });
-await page.evaluate(async ()=>{ const { G } = await import('./js/engine/state.js'); G.s.flags.bici_on = false; });
+await page.evaluate(async ()=>{ const { G } = await import('./js/engine/state.js'); G.s.vehicle = null; });
 await go('vedano', 20, 6);
 await page.screenshot({ path: `tools/3d-parco${tag}.png` });
 await go('vedano', 6, 12);

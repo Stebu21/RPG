@@ -229,6 +229,15 @@ html, body {
   box-shadow:0 6px 18px rgba(78,104,200,.4);
 }
 #btn-back:active { background:rgba(110,140,235,.95); }
+#btn-run, #btn-ride {
+  position:absolute; pointer-events:auto; width:48px; height:48px; border-radius:50%;
+  font-size:20px; color:#fff; border:1px solid rgba(255,255,255,.3);
+  background:rgba(40,160,120,.65); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+}
+#btn-run { right:160px; bottom:max(24px, env(safe-area-inset-bottom)); }
+#btn-ride { right:22px; bottom:max(132px, calc(env(safe-area-inset-bottom) + 118px)); background:rgba(200,140,40,.7); }
+#btn-run.on { background:rgba(60,220,160,.95); }
+#btn-ride.hidden { display:none; }
 
 /* ---------- battaglia ---------- */
 #screen-battle { display:flex; flex-direction:column; background:#10102a; }

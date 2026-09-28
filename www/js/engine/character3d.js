@@ -413,6 +413,40 @@ export class Person {
   }
 }
 
+// monopattino elettrico: pedana, piantone, manubrio, ruotine piene
+export function makeScooter(){
+  const g = new THREE.Group();
+  const deck = std(0x2b2e36, { metalness:0.5, roughness:0.4 }), acc = std(0x33c4a8, { metalness:0.4, roughness:0.3 }), tire = std(0x111111);
+  const wheels = [];
+  for (const z of [-0.27, 0.27]){ const w = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.025, 8, 18), tire); w.rotation.y = Math.PI/2; w.position.set(0, 0.1, z); g.add(w); wheels.push(w); }
+  const d = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.035, 0.52), deck); d.position.y = 0.12; g.add(d);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.75, 8), acc); stem.position.set(0, 0.48, 0.28); stem.rotation.x = -0.12; g.add(stem);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.36, 8), deck); bar.rotation.z = Math.PI/2; bar.position.set(0, 0.85, 0.24); g.add(bar);
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 6), new THREE.MeshBasicMaterial({ color:0xffffff })); led.position.set(0, 0.7, 0.31); g.add(led);
+  g.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
+  g.userData.wheels = wheels; g.userData.wheelR = 0.075;
+  return g;
+}
+
+// Vespa: scocca tondeggiante celeste, sella, scudo anteriore, faro
+export function makeVespa(){
+  const g = new THREE.Group();
+  const body = std(0x8fd3e8, { metalness:0.3, roughness:0.25 }), dark = std(0x2a2a2a), chrome = std(0xdddddd, { metalness:1, roughness:0.2 });
+  const wheels = [];
+  for (const z of [-0.32, 0.34]){ const w = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.04, 8, 18), dark); w.rotation.y = Math.PI/2; w.position.set(0, 0.15, z); g.add(w); wheels.push(w); }
+  const rear = new THREE.Mesh(new THREE.SphereGeometry(0.2, 18, 12), body); rear.scale.set(0.9, 0.75, 1.3); rear.position.set(0, 0.32, -0.22); g.add(rear);
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.36), dark); floor.position.set(0, 0.2, 0.08); g.add(floor);
+  const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.5, 16, 1, false, -Math.PI/2, Math.PI), body);
+  shield.position.set(0, 0.45, 0.3); g.add(shield);
+  const seat = new THREE.Mesh(new THREE.CapsuleGeometry(0.07, 0.3, 4, 10), std(0x4a2a1a)); seat.rotation.x = Math.PI/2; seat.position.set(0, 0.5, -0.18); g.add(seat);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.42, 8), chrome); bar.rotation.z = Math.PI/2; bar.position.set(0, 0.78, 0.3); g.add(bar);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 8), new THREE.MeshStandardMaterial({ color:0xfff6d0, emissive:0xfff0b0, emissiveIntensity:1.5 }));
+  lamp.position.set(0, 0.8, 0.36); g.add(lamp);
+  g.traverse(o=>{ if (o.isMesh) o.castShadow = true; });
+  g.userData.wheels = wheels; g.userData.wheelR = 0.11;
+  return g;
+}
+
 // bici da città: telaio rosso, ruote a raggi
 export function makeBike(){
   const g = new THREE.Group();

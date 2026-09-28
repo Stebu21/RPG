@@ -4,6 +4,8 @@
 // 1-5 = paesi (portali)  S = Sacro Monte  A = Accademia
 // I trigger (porte, NPC, forzieri, eventi) sono definiti per coordinate.
 
+import { OSM_TOWNS } from './towns_osm.js';
+
 export const MAPS = {
 
   world: {
@@ -482,7 +484,148 @@ MAPS.negozio_samarate = negozioDi('samarate', 'Bottega di Samarate', { map:'sama
 MAPS.locanda_samarate = locandaDi('samarate', 'Locanda di Samarate', { map:'samarate', x:15, y:11 });
 MAPS.chiesa_samarate  = chiesaDi('Chiesa della SS. Trinità', { map:'samarate', x:13, y:8 });
 
-// le seconde case usano l'altro abitante
+// ---------- paesi reali da OpenStreetMap ----------
+// Le mappe generate da tools/osm-town.mjs sostituiscono quelle disegnate a
+// mano; porte, personaggi e oggetti vengono agganciati agli edifici veri.
+function osmTown(id, name, worldAt, place){
+  if (!OSM_TOWNS[id]) return;
+  const t = OSM_TOWNS[id], P = t.poi, list = [];
+  const slot = (k, i=0)=>P[k]?.free?.[i] || P.entry.spawn;
+  const H = {
+    P,
+    ret:k=>({ map:id, x:P[k].front[0], y:P[k].front[1] }),
+    door:(k, to)=>{ if (P[k]) list.push({ x:P[k].door[0], y:P[k].door[1], type:'portal', to }); },
+    event:(k, event)=>{ if (P[k]) list.push({ x:P[k].door[0], y:P[k].door[1], type:'door_event', event }); },
+    at:(k, i, extra)=>{ const [x, y] = slot(k, i); list.push({ x, y, ...extra }); },
+  };
+  for (const [x, y] of P.entry.portals) list.push({ x, y, type:'portal', to:{ map:'world', ...worldAt } });
+  place(H);
+  MAPS[id] = { name, music:'town', town:true, tiles:t.tiles, streets:t.streets, triggers:list, osm:true,
+               spawn:{ x:P.entry.spawn[0], y:P.entry.spawn[1] } };
+  // la mappa del mondo porta all'ingresso vero del paese
+  const wp = MAPS.world.triggers.find(tr=>tr.type === 'portal' && tr.to.map === id);
+  if (wp) wp.to = { map:id, x:P.entry.spawn[0], y:P.entry.spawn[1] };
+}
+
+osmTown('vedano', 'Vedano Olona', { x:31, y:18 }, H=>{
+  MAPS.casa_vedano1 = interno('casa', 'Casa di Via Monetti 22', H.ret('casa1'));
+  MAPS.casa_vedano2 = interno('casa', 'Casa di Via Barlassina 6', H.ret('casa2'));
+  MAPS.casa_vedano3 = interno('casa', 'Casa di Via Adua 64', H.ret('casa3'));
+  MAPS.negozio_vedano = negozioDi('vedano', 'Alimentari di Piazza San Rocco', H.ret('negozio'));
+  MAPS.locanda_vedano = locandaDi('vedano', 'Locanda della Piazza', H.ret('locanda'));
+  MAPS.chiesa_vedano  = chiesaDi('Chiesa di San Maurizio', H.ret('chiesa'));
+  H.door('casa1', { map:'casa_vedano1', x:4, y:5 });
+  H.door('casa2', { map:'casa_vedano2', x:4, y:5 });
+  H.door('casa3', { map:'casa_vedano3', x:4, y:5 });
+  H.door('negozio', { map:'negozio_vedano', x:4, y:5 });
+  H.door('locanda', { map:'locanda_vedano', x:5, y:6 });
+  H.door('chiesa', { map:'chiesa_vedano', x:4, y:7 });
+  H.event('lazzaretto', 'lazzaretto');
+  H.at('sanRocco', 0, { type:'npc', npc:'vedano_custode', sprite:'#8a7a66' });
+  H.at('chiesa', 0, { type:'npc', npc:'vedano_cittadino', sprite:'#b08968' });
+  H.at('negozio', 0, { type:'quest', quest:'vedano_lupi', sprite:'#cccccc' });
+  H.at('gundam', 0, { type:'quest', quest:'vedano_gundam', sprite:'#5b8fd8' });
+  H.at('gundam', 1, { type:'chest', id:'ve_parco', item:'vernice', qty:1 });
+  H.at('sanRocco', 2, { type:'npc', npc:'vedano_passante1', sprite:'#c97a5a' });
+  H.at('casa1', 1, { type:'npc', npc:'vedano_passante2', sprite:'#6a8fb5' });
+  H.at('lazzaretto', 0, { type:'npc', npc:'vedano_passante3', sprite:'#9b8a6a' });
+  H.at('casa3', 1, { type:'npc', npc:'vedano_passante4', sprite:'#b56a8f' });
+  // mezzi di trasporto da trovare in paese
+  H.at('sanRocco', 1, { type:'vehicle', vehicle:'bici' });
+  H.at('casa1', 0, { type:'vehicle', vehicle:'monopattino' });
+  H.at('casa3', 0, { type:'vehicle', vehicle:'vespa' });
+});
+
+osmTown('castiglione', 'Castiglione Olona', { x:31, y:25 }, H=>{
+  MAPS.casa_castiglione1   = interno('casa', 'Palazzo Branda Castiglioni', H.ret('casa1'));
+  MAPS.casa_castiglione2   = interno('casa', 'Palazzo dei Castiglioni di Monteruzzo', H.ret('casa2'));
+  MAPS.negozio_castiglione = negozioDi('castiglione', 'Bottega del Borgo', H.ret('negozio'));
+  MAPS.locanda_castiglione = locandaDi('castiglione', 'Locanda alla Collegiata', H.ret('locanda'));
+  MAPS.chiesa_castiglione  = chiesaDi('Chiesa di Villa', H.ret('chiesa'));
+  H.door('casa1', { map:'casa_castiglione1', x:4, y:5 });
+  H.door('casa2', { map:'casa_castiglione2', x:4, y:5 });
+  H.door('negozio', { map:'negozio_castiglione', x:4, y:5 });
+  H.door('locanda', { map:'locanda_castiglione', x:5, y:6 });
+  H.door('chiesa', { map:'chiesa_castiglione', x:4, y:7 });
+  H.event('collegiata', 'collegiata');
+  H.at('casa1', 0, { type:'npc', npc:'castiglione_palazzo', sprite:'#c9b458' });
+  H.at('collegiata', 0, { type:'npc', npc:'castiglione_pasq_npc', sprite:'#e67e22', hideFlag:'pasq_join' });
+  H.at('piazza', 0, { type:'quest', quest:'castiglione_spettri', sprite:'#8e6cc9' });
+  H.at('chiesa', 0, { type:'quest', quest:'castiglione_reliquia', sprite:'#d98ec0' });
+  H.at('collegiata', 1, { type:'chest', id:'c_reliquia', item:'reliquia', qty:1 });
+  H.at('piazza', 1, { type:'npc', npc:'castiglione_pittore', sprite:'#7a9ab5' });
+  H.at('piazza', 2, { type:'npc', npc:'castiglione_dama', sprite:'#c98ab5' });
+  H.at('locanda', 0, { type:'vehicle', vehicle:'monopattino' });
+});
+
+osmTown('jerago', 'Jerago con Orago', { x:19, y:31 }, H=>{
+  MAPS.casa_jerago    = interno('casa', 'Casa di Jerago', H.ret('casa1'));
+  MAPS.negozio_jerago = negozioDi('jerago', 'Bottega di Jerago', H.ret('negozio'));
+  MAPS.locanda_jerago = locandaDi('jerago', 'Locanda di Jerago', H.ret('locanda'));
+  MAPS.chiesa_jerago  = chiesaDi('Chiesa di San Giorgio', H.ret('chiesa'));
+  H.door('casa1', { map:'casa_jerago', x:4, y:5 });
+  H.door('negozio', { map:'negozio_jerago', x:4, y:5 });
+  H.door('locanda', { map:'locanda_jerago', x:5, y:6 });
+  H.door('chiesa', { map:'chiesa_jerago', x:4, y:7 });
+  H.event('castello', 'castello');
+  H.at('castello', 0, { type:'npc', npc:'jerago_castellano', sprite:'#9aa7b8' });
+  H.at('chiesa', 0, { type:'quest', quest:'jerago_cinghiali', sprite:'#b08968' });
+  H.at('locanda', 0, { type:'npc', npc:'jerago_bambino', sprite:'#d9a05a' });
+  H.at('negozio', 0, { type:'npc', npc:'jerago_contadina', sprite:'#a07a5a' });
+  H.at('chiesa', 1, { type:'vehicle', vehicle:'bici' });
+});
+
+osmTown('samarate', 'Samarate', { x:9, y:36 }, H=>{
+  MAPS.casa_samarate1   = interno('casa', 'Casa di Samarate', H.ret('casa1'));
+  MAPS.casa_samarate2   = interno('casa', 'Casa di Verghera', H.ret('casa2'));
+  MAPS.negozio_samarate = negozioDi('samarate', 'Bottega di Samarate', H.ret('negozio'));
+  MAPS.locanda_samarate = locandaDi('samarate', 'Locanda di Samarate', H.ret('locanda'));
+  MAPS.chiesa_samarate  = chiesaDi('Chiesa della SS. Trinità', H.ret('chiesa'));
+  H.door('casa1', { map:'casa_samarate1', x:4, y:5 });
+  H.door('casa2', { map:'casa_samarate2', x:4, y:5 });
+  H.door('negozio', { map:'negozio_samarate', x:4, y:5 });
+  H.door('locanda', { map:'locanda_samarate', x:5, y:6 });
+  H.door('chiesa', { map:'chiesa_samarate', x:4, y:7 });
+  H.event('officina', 'officina');
+  H.at('officina', 0, { type:'quest', quest:'samarate_automi', sprite:'#8aa1c9' });
+  H.at('officina', 1, { type:'npc', npc:'samarate_sofy_npc', sprite:'#f1c40f', hideFlag:'sofy_join' });
+  H.at('chiesa', 0, { type:'npc', npc:'samarate_pilota', sprite:'#c9b458' });
+  H.at('casa2', 0, { type:'npc', npc:'samarate_nonna', sprite:'#c9a0c0' });
+  H.at('negozio', 0, { type:'npc', npc:'samarate_meccanico', sprite:'#7a7a8a' });
+  H.at('locanda', 0, { type:'vehicle', vehicle:'vespa' });
+});
+
+osmTown('varese', 'Varese', { x:24, y:10 }, H=>{
+  MAPS.casa_varese1   = interno('casa', 'Casa di Varese', H.ret('casa1'));
+  MAPS.casa_varese2   = interno('casa', 'Casa di Varese', H.ret('casa2'));
+  MAPS.casa_varese4   = interno('casa', 'Casa di Biumo', H.ret('casa4'));
+  MAPS.casa_varese5   = interno('casa', 'Casa di Giubiano', H.ret('casa5'));
+  MAPS.casa_varese3   = interno('casa', 'Palazzo Estense', H.ret('casa3'));
+  MAPS.negozio_varese = negozioDi('varese', 'Bottega del Corso', H.ret('negozio'));
+  MAPS.locanda_varese = locandaDi('varese', 'Locanda del Corso', H.ret('locanda'));
+  MAPS.chiesa_varese  = chiesaDi('Basilica di San Vittore', H.ret('chiesa'));
+  for (const k of ['casa1','casa2','casa3','casa4','casa5']) H.door(k, { map:'casa_' + k.replace('casa', 'varese'), x:4, y:5 });
+  H.door('negozio', { map:'negozio_varese', x:4, y:5 });
+  H.door('locanda', { map:'locanda_varese', x:5, y:6 });
+  H.door('chiesa', { map:'chiesa_varese', x:4, y:7 });
+  // l'Accademia del Sacro Monte si raggiunge dal lato nord della città
+  H.at('accademia', 0, { type:'portal', to:{ map:'accademia', x:9, y:9 } });
+  H.at('chiesa', 0, { type:'npc', npc:'varese_casa', sprite:'#b08968' });
+  H.at('negozio', 0, { type:'npc', npc:'varese_mercante', sprite:'#c9883c' });
+  H.at('casa4', 0, { type:'npc', npc:'varese_casa2', sprite:'#8aa1c9' });
+  H.at('casa3', 0, { type:'quest', quest:'varese_lumache', sprite:'#69a35d' });
+  H.at('chiesa', 1, { type:'quest', quest:'varese_corvi', sprite:'#d98ec0' });
+  H.at('locanda', 0, { type:'npc', npc:'varese_guardia', sprite:'#9aa7b8' });
+  H.at('casa3', 1, { type:'chest', id:'v_giardini', item:'etere', qty:1 });
+  H.at('negozio', 1, { type:'vehicle', vehicle:'bici' });
+});
+// l'uscita dell'Accademia riporta accanto al suo ingresso a Varese
+if (MAPS.varese.osm){
+  const acc = MAPS.varese.triggers.find(t=>t.to?.map === 'accademia');
+  for (const t of MAPS.accademia.triggers) if (t.type === 'portal' && t.to.map === 'varese') t.to = { map:'varese', x:acc.x, y:acc.y + 1 };
+}
+
+// le seconde case usano l'altro abitante (anche quelle ridefinite dai paesi OSM)
 for (const id of ['casa_varese2','casa_varese5','casa_vedano2','casa_castiglione2','casa_samarate2']){
   const t = MAPS[id].triggers.find(t=>t.type === 'npc');
   if (t) t.npc = 'abitante2';

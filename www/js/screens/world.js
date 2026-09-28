@@ -367,6 +367,14 @@ function fireActionTrigger(t){
       showDialog(v.lines.map(l=>[v.name, l]));
       return;
     }
+    case 'vehicle': {
+      if (G.s.items[t.vehicle] > 0) return;
+      addItem(t.vehicle, 1);
+      G.s.vehicle = t.vehicle;
+      sfx('levelup');
+      showDialog([['', `Hai trovato: ${VEHICLES[t.vehicle].name}! Ci sali subito. Premi V (o il tasto 🚲) per scendere o cambiare mezzo.`]]);
+      return;
+    }
     case 'chest': {
       if (G.s.chests[t.id]) { showDialog([['','Il forziere è vuoto.']]); return; }
       G.s.chests[t.id] = true;
@@ -450,12 +458,29 @@ function openInn(town){
   ]);
 }
 
+// se la posizione salvata non è più calpestabile (es. mappa rigenerata da
+// OpenStreetMap) si sposta il giocatore sulla casella libera più vicina
+function fixSpawn(){
+  if (walkable(player.x, player.y) && !triggerAt(player.x, player.y)) return;
+  const seen = new Set(), q = [[player.x, player.y]];
+  while (q.length){
+    const [x, y] = q.shift();
+    if (walkable(x, y) && !triggerAt(x, y)){ player = newPlayer(x, y); G.s.x = x; G.s.y = y; return; }
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const k = (x + dx) + ',' + (y + dy);
+      if (!seen.has(k) && Math.abs(x + dx - player.x) < 60 && Math.abs(y + dy - player.y) < 60){ seen.add(k); q.push([x + dx, y + dy]); }
+    }
+  }
+  if (map.spawn){ player = newPlayer(map.spawn.x, map.spawn.y); G.s.x = map.spawn.x; G.s.y = map.spawn.y; }
+}
+
 // ---------- mappa ----------
 export function loadMap(name, x, y){
   map = MAPS[name];
   G.s.map = name;
   G.s.x = x; G.s.y = y;
   player = newPlayer(x, y);
+  fixSpawn();
   hudLoc.textContent = map.name;
   playMusic(map.music || 'world');
   checkEnterEvents();
@@ -488,17 +513,52 @@ function tryEncounter(){
 // si piega in curva e si rimbalza contro gli ostacoli.
 const PHYS = {
   walk: { max:3.4, accel:28, fric:16 },
-  run:  { max:5.6, accel:30, fric:14 },
-  bike: { max:9.0, accel:9,  fric:1.8, turn:5 },
+  run:  { max:5.6, accel:30, fric:14 },        // Shift o 🏃: sempre disponibile
+  sprint:{ max:6.8, accel:32, fric:14 },       // con le Scarpe da Corsa
+};
+// mezzi: la bici va di inerzia, il monopattino scatta e curva stretto, la Vespa è la più veloce
+export const VEHICLES = {
+  bici:        { name:'Bicicletta', max:9.0,  accel:9,  fric:1.8, turn:5, seat:0.28, pedal:true },
+  monopattino: { name:'Monopattino Elettrico', max:7.5, accel:15, fric:3.0, turn:8, seat:0.12, stand:true },
+  vespa:       { name:'Vespa', max:12.5, accel:7, fric:1.1, turn:3.8, seat:0.36 },
 };
 const RADIUS = 0.3;       // raggio di collisione del giocatore (caselle)
 let running = false;
 let lastTs = 0;
 
-window.addEventListener('keydown', e=>{ if (e.key === 'Shift') running = true; });
+window.addEventListener('keydown', e=>{
+  if (e.key === 'Shift') running = true;
+  if ((e.key === 'v' || e.key === 'V') && currentScreen() === 'world' && !e.repeat) toggleRide();
+});
 window.addEventListener('keyup',   e=>{ if (e.key === 'Shift') running = false; });
+// pulsanti touch: corsa (tieni premuto) e sali/scendi dal mezzo
+{
+  const run = document.getElementById('btn-run');
+  const on = e=>{ e.preventDefault(); running = true; run.classList.add('on'); };
+  const off = e=>{ e.preventDefault(); running = false; run.classList.remove('on'); };
+  run.addEventListener('touchstart', on, { passive:false }); run.addEventListener('touchend', off, { passive:false });
+  run.addEventListener('mousedown', on); run.addEventListener('mouseup', off); run.addEventListener('mouseleave', off);
+  document.getElementById('btn-ride').addEventListener('click', ()=>toggleRide());
+}
 
-const onBike = ()=>G.s.flags.bici_on && (G.s.items.bici > 0) && !map.indoor;
+// mezzo in uso (solo all'aperto e se lo si possiede)
+const riding = ()=>{
+  const v = G.s.vehicle;
+  return v && G.s.items[v] > 0 && !map.indoor ? v : null;
+};
+const onBike = ()=>!!riding();
+function ownedVehicles(){ return Object.keys(VEHICLES).filter(v=>G.s.items[v] > 0); }
+// V: sali sul mezzo, cambia mezzo o scendi
+function toggleRide(){
+  if (busy || !G.s) return;
+  const own = ownedVehicles();
+  if (!own.length){ showDialog([['', 'Non hai ancora un mezzo. Cercane uno in giro per i paesi: bici, monopattini, persino una Vespa!']]); return; }
+  if (map.indoor){ sfx('cancel'); return; }
+  const i = own.indexOf(G.s.vehicle);
+  G.s.vehicle = i < 0 ? own[0] : own[i + 1] || null;      // giro: primo mezzo, il successivo, poi a piedi
+  sfx(G.s.vehicle ? 'confirm' : 'cancel');
+  player.lean = 0;
+}
 
 // il cerchio (cx, cz, r) tocca una casella bloccata?
 function collides(cx, cz, r){
@@ -559,7 +619,7 @@ function update(dt){
   }
   if (busy){ player.vx = player.vz = 0; return; }
   const bike = onBike();
-  const P = bike ? PHYS.bike : (running && G.s.items.scarpe > 0) ? PHYS.run : PHYS.walk;
+  const P = bike ? VEHICLES[riding()] : running ? (G.s.items.scarpe > 0 ? PHYS.sprint : PHYS.run) : PHYS.walk;
   const ax = Input.axis();
   let ix = ax.x, iz = ax.y;
   const len = Math.hypot(ix, iz);
@@ -652,6 +712,7 @@ function onAction(){
 }
 
 // ---------- rendering (three.js) ----------
+let hudT = 0;
 function render(dt){
   if (builtMap !== map){
     W3.build(map, G.s.map, map.triggers);
@@ -664,6 +725,12 @@ function render(dt){
   // NPC e personaggi delle missioni: si girano verso il giocatore quando è vicino
   for (const t of activeTriggers()){
     if (t.type === 'chest'){ W3.chest(t.id, t.x, t.y, !!G.s.chests[t.id]); continue; }
+    if (t.type === 'vehicle'){
+      if (G.s.items[t.vehicle] > 0) continue;              // già preso: lo porti con te
+      const v = W3.vehicle('veh:' + t.x + ',' + t.y, t.vehicle);
+      v.mesh.position.set(t.x + 0.5, 0, t.y + 0.5); v.mesh.rotation.set(0, 0.6, -0.12);   // appoggiato sul cavalletto
+      continue;
+    }
     if (t.type !== 'npc' && t.type !== 'quest') continue;
     const id = 't:' + (t.npc || t.quest) + ':' + t.x + ',' + t.y;
     const p = W3.person(id, t.sprite || '#b08968');
@@ -691,18 +758,37 @@ function render(dt){
   const sp = Math.hypot(player.vx, player.vz);
   if (sp > 0.3) player.face = Math.atan2(player.vx, player.vz);
   const me = W3.person('player:' + G.s.hero, leader);
-  const seat = bike ? 0.28 : 0;
+  const ride = riding(), V = ride && VEHICLES[ride];
+  const seat = V ? V.seat : 0;
   me.update(dt, player.face ?? { down:0, right:Math.PI/2, up:Math.PI, left:-Math.PI/2 }[player.dir], bike ? 0 : sp, player.walk);
-  if (bike){
-    // in sella: gambe piegate sui pedali che girano
-    const b = W3.bike();
+  if (ride){
+    const b = W3.vehicle('ride', ride);
     b.mesh.position.set(player.px, player.hop, player.pz);
     b.mesh.rotation.set(0, me.angle, player.lean);
-    for (const w of b.mesh.userData.wheels) w.rotation.x += sp * dt / 0.17;
-    me.legs.forEach((l, i)=>{ const a = player.walk * Math.PI * 4 + i * Math.PI; l.hip.rotation.x = -1.1 + Math.sin(a) * 0.35; l.knee.rotation.x = 1.3 + Math.cos(a) * 0.3; });
-    me.arms.forEach(a=>{ a.sh.rotation.x = -0.9; a.el.rotation.x = -0.3; });
+    for (const w of b.mesh.userData.wheels) w.rotation.x += sp * dt / (b.mesh.userData.wheelR || 0.17);
+    if (V.pedal){        // in sella: gambe sui pedali che girano
+      me.legs.forEach((l, i)=>{ const a = player.walk * Math.PI * 4 + i * Math.PI; l.hip.rotation.x = -1.1 + Math.sin(a) * 0.35; l.knee.rotation.x = 1.3 + Math.cos(a) * 0.3; });
+      me.arms.forEach(a=>{ a.sh.rotation.x = -0.9; a.el.rotation.x = -0.3; });
+    } else if (V.stand){ // in piedi sulla pedana
+      me.legs.forEach((l, i)=>{ l.hip.rotation.x = i ? 0.15 : -0.15; l.knee.rotation.x = 0.1; });
+      me.arms.forEach(a=>{ a.sh.rotation.x = -0.8; a.el.rotation.x = -0.4; });
+    } else {             // seduti sulla Vespa
+      me.legs.forEach(l=>{ l.hip.rotation.x = -1.4; l.knee.rotation.x = 1.5; });
+      me.arms.forEach(a=>{ a.sh.rotation.x = -1.1; a.el.rotation.x = -0.4; });
+    }
   }
+  if (me.staff) me.staff.rotation.x = -(me.weaponArm.sh.rotation.x + me.weaponArm.el.rotation.x);   // bastone sempre dritto
+  document.getElementById('btn-ride').classList.toggle('hidden', !ownedVehicles().length);
   me.place(player.px, player.pz, bike ? player.lean : 0, player.hop + seat);
+
+  // HUD: paese e via in cui ci si trova (nomi da OpenStreetMap)
+  hudT -= dt;
+  if (hudT <= 0 && map.streets){
+    hudT = 0.3;
+    const st = W3.streetAt(player.px, player.pz);
+    const txt = st ? `${map.name} · ${st}` : map.name;
+    if (hudLoc.textContent !== txt) hudLoc.textContent = txt;
+  }
 
   W3.endActors();
   W3.render(dt, { x:player.px, z:player.pz }, {
@@ -728,6 +814,7 @@ registerScreen('world', {
     if (!params?.resume){
       map = MAPS[G.s.map];
       player = newPlayer(G.s.x, G.s.y);
+      fixSpawn();
       hudLoc.textContent = map.name;
       playMusic(map.music || 'world');
       checkEnterEvents();

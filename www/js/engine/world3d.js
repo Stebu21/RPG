@@ -9,9 +9,19 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { Person, makeBike } from './character3d.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Person, makeBike, makeScooter, makeVespa } from './character3d.js';
+const MAKE_VEHICLE = { bici:makeBike, monopattino:makeScooter, vespa:makeVespa };
 
 // ---------- util ----------
+// Solo su telefoni/tablet (schermo touch o finestra stretta) la camera sta più lontana:
+// con il display piccolo la vista ravvicinata rende difficile orientarsi.
+export const MOBILE_ZOOM = ()=>{
+  const touch = window.matchMedia?.('(pointer: coarse)').matches;
+  const small = Math.min(window.innerWidth, window.innerHeight) < 600;
+  if (!(touch || small)) return 1;
+  return window.innerWidth < window.innerHeight ? 2.2 : 1.55;   // in verticale la vista orizzontale è stretta: più lontano
+};
 function hash(x, y, s=0){
   let h = (x*374761393 + y*668265263 + s*2147483647) | 0;
   h = (h ^ (h >>> 13)) * 1274126177 | 0;
@@ -126,7 +136,7 @@ function floorOf(getCh, x, y){
 }
 
 function paintGroundTexture(map, getCh, W, H, indoor){
-  const P = 32;
+  const P = Math.max(8, Math.min(32, Math.floor(4096 / Math.max(W, H))));   // mappe OSM grandi: meno pixel per casella
   return canvasTex(W*P, H*P, (g)=>{
     for (let y=0; y<H; y++) for (let x=0; x<W; x++){
       let ch = getCh(x, y);
@@ -138,10 +148,12 @@ function paintGroundTexture(map, getCh, W, H, indoor){
     // sfuma i confini tra superfici (niente griglia visibile)
     const snap = document.createElement('canvas'); snap.width = W*P; snap.height = H*P;
     snap.getContext('2d').drawImage(g.canvas, 0, 0);
-    g.filter = 'blur(5px)'; g.drawImage(snap, 0, 0); g.filter = 'none';
-    // dettagli per casella
+    g.filter = `blur(${Math.max(1, P * 5 / 32)}px)`; g.drawImage(snap, 0, 0); g.filter = 'none';
+    // dettagli per casella (disegnati a 32px e scalati)
+    const sc = P / 32;
+    g.save(); g.scale(sc, sc);
     for (let y=0; y<H; y++) for (let x=0; x<W; x++){
-      const ch = getCh(x, y), X = x*P, Y = y*P;
+      const ch = getCh(x, y), X = x*32, Y = y*32;
       if (ch === ':'){ // pavé a lisca / cubetti di porfido
         for (let r=0; r<4; r++) for (let k=0; k<4; k++){
           const t = hash(x*4+k, y*4+r, 21);
@@ -152,30 +164,31 @@ function paintGroundTexture(map, getCh, W, H, indoor){
         for (let i=0; i<30; i++){
           const t = hash(x*31+i, y, 22);
           g.fillStyle = t > .5 ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.12)';
-          g.fillRect(X+hash(i,x,23)*P, Y+hash(i,y,24)*P, 2, 2);
+          g.fillRect(X+hash(i,x,23)*32, Y+hash(i,y,24)*32, 2, 2);
         }
       } else if (ch === '.' || ch === ',' || ch === 'F'){
         for (let i=0; i<26; i++){
           const t = hash(x*37+i, y*11, 25);
           g.fillStyle = t > .6 ? 'rgba(200,230,120,.20)' : 'rgba(20,60,10,.20)';
-          g.fillRect(X+hash(i,x,26)*P, Y+hash(i,y,27)*P, 1+t*2, 3);
+          g.fillRect(X+hash(i,x,26)*32, Y+hash(i,y,27)*32, 1+t*2, 3);
         }
       } else if (ch === 'w'){ // parquet
         for (let r=0; r<4; r++){
           g.fillStyle = `rgba(60,30,10,${.15+hash(x,y*4+r,28)*.2})`;
-          g.fillRect(X, Y+r*8, P, 1);
-          g.fillRect(X+hash(x,r,29)*P, Y+r*8, 1, 8);
+          g.fillRect(X, Y+r*8, 32, 1);
+          g.fillRect(X+hash(x,r,29)*32, Y+r*8, 1, 8);
         }
       } else if (ch === 'R'){
         g.strokeStyle = 'rgba(240,200,90,.6)'; g.lineWidth = 2;
-        g.strokeRect(X+3, Y+3, P-6, P-6);
+        g.strokeRect(X+3, Y+3, 26, 26);
       } else if (ch === '^'){
         for (let i=0; i<10; i++){
           g.fillStyle = `rgba(${hash(i,x,30)>.5?255:0},${hash(i,x,30)>.5?255:0},${hash(i,x,30)>.5?255:0},.1)`;
-          g.fillRect(X+hash(i,x,31)*P, Y+hash(i,y,32)*P, 5, 3);
+          g.fillRect(X+hash(i,x,31)*32, Y+hash(i,y,32)*32, 5, 3);
         }
       }
     }
+    g.restore();
   });
 }
 
@@ -329,13 +342,19 @@ export class World3D {
     this.map = map; this.mapName = mapName;
     this.indoor = !!map.indoor;
     this.animated = []; this.lamps = []; this.windows = [];
+    // materiali che cambiano di notte: uno solo per tipo, così si possono fondere le geometrie
+    this.lampMat = new THREE.MeshStandardMaterial({ color:0xfff0c0, emissive:0xffc070, emissiveIntensity:0.2 });
+    this.winMat = new THREE.MeshStandardMaterial({ color:0x2a3542, roughness:0.2, metalness:0.3, emissive:0xffb35a, emissiveIntensity:0 });
+    this.roseMat = new THREE.MeshStandardMaterial({ color:0x3050a0, emissive:0x2040a0, emissiveIntensity:0.3, metalness:0.2, roughness:0.3 });
+    this.windows = [this.winMat, this.roseMat];
+    this.dynMats = new Set([this.lampMat, this.winMat, this.roseMat]);
     const H = map.tiles.length, W = Math.max(...map.tiles.map(r=>r.length));
     this.W = W; this.H = H;
     const getCh = (x, y)=>{ const r = map.tiles[y]; return (!r || x < 0 || x >= r.length) ? ' ' : r[x]; };
     this.getCh = getCh;
 
     // terreno a rilievo
-    const seg = 3;
+    const seg = W * H > 6000 ? 1 : 3;
     const geo = new THREE.PlaneGeometry(W, H, W*seg, H*seg);
     geo.rotateX(-Math.PI/2);
     geo.translate(W/2, 0, H/2);
@@ -364,6 +383,13 @@ export class World3D {
     }
 
     this.buildProps(g, getCh, W, H, triggers);
+    this.streets = map.streets || [];
+    if (this.streets.length) this.buildStreetSigns(g, getCh);
+    this.lampLights = [];
+    if (this.lamps.length){
+      for (let i=0; i<6; i++){ const l = new THREE.PointLight(0xffb870, 0, 10, 1.5); l.position.y = 2; g.add(l); this.lampLights.push(l); }
+    }
+    this.mergeStatic(g);
 
     // luce: cielo e ombre in base all'ora reale
     this.setupLighting(W, H);
@@ -371,6 +397,98 @@ export class World3D {
     this.scene.fog = this.indoor ? null : new THREE.Fog(0xbfd6ea, 40, 160);
     this.sky.visible = !this.indoor;
     this.scene.background = this.indoor ? new THREE.Color(0x0b0a10) : null;
+  }
+
+  // Fonde le mesh statiche con lo stesso materiale in blocchi di 16x16 caselle:
+  // le mappe OSM hanno migliaia di pezzi (muri, tetti, finestre) e senza
+  // fusione le chiamate di disegno sarebbero decine di migliaia.
+  mergeStatic(g){
+    g.updateMatrixWorld(true);
+    const CH = 16, buckets = new Map(), mats = new Map();
+    const keyOf = m=>this.dynMats.has(m) ? m.uuid : [m.type, m.color?.getHex(), m.map?.uuid, m.emissive?.getHex(), m.emissiveIntensity,
+      m.roughness, m.metalness, m.transparent, m.opacity, m.side, m.flatShading, m.alphaTest].join('|');
+    const wp = new THREE.Vector3();
+    g.traverse(o=>{
+      if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || o.material.isShaderMaterial) return;
+      for (let p = o; p && p !== g; p = p.parent) if (p.userData.dyn) return;
+      if (o.geometry.attributes.position.count > 20000) return;           // il terreno resta com'è
+      wp.setFromMatrixPosition(o.matrixWorld);
+      const mk = keyOf(o.material);
+      const k = mk + '#' + Math.floor(wp.x / CH) + ',' + Math.floor(wp.z / CH) + '#' + o.castShadow;
+      if (!buckets.has(k)){ buckets.set(k, []); mats.set(k, o.material); }
+      buckets.get(k).push(o);
+    });
+    let merged = 0;
+    for (const [k, list] of buckets){
+      if (list.length < 2) continue;
+      const geos = list.map(o=>{
+        let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        for (const a of Object.keys(geo.attributes)) if (!['position','normal','uv'].includes(a)) geo.deleteAttribute(a);
+        if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+        geo.applyMatrix4(o.matrixWorld);
+        return geo;
+      });
+      const mg = mergeGeometries(geos, false);
+      geos.forEach(x=>x.dispose());
+      if (!mg) continue;
+      const mesh = new THREE.Mesh(mg, mats.get(k));
+      mesh.castShadow = list[0].castShadow; mesh.receiveShadow = true;
+      g.add(mesh);
+      for (const o of list){ o.parent.remove(o); o.geometry.dispose(); }
+      merged += list.length;
+    }
+    this.mergedCount = merged;
+  }
+
+  // cartelli con il nome delle vie (dati OpenStreetMap), accanto alla strada
+  buildStreetSigns(g, getCh){
+    const walkSide = (x, y)=>{
+      for (const [dx, dy] of [[0,1],[1,0],[-1,0],[0,-1],[1,1],[-1,1]]){
+        const c = getCh(x + dx, y + dy);
+        if ('.,F'.includes(c)) return [x + dx, y + dy];
+      }
+      return null;
+    };
+    const pole = mat(0x55595f, { metalness:0.6, roughness:0.4 });
+    const placed = [];
+    for (const st of this.streets){
+      // punto a metà della polilinea più lunga
+      let best = null;
+      for (const l of st.lines) if (!best || l.length > best.length) best = l;
+      const n = best.length > 12 ? [best[Math.floor(best.length * 0.3)], best[Math.floor(best.length * 0.7)]] : [best[Math.floor(best.length / 2)]];
+      for (const p of n){
+        const spot = walkSide(p[0], p[1]);
+        if (!spot || placed.some(q=>Math.hypot(q[0] - spot[0], q[1] - spot[1]) < 6)) continue;
+        placed.push(spot);
+        const tex = canvasTex(256, 64, (c, w, h)=>{
+          c.fillStyle = '#f4f1e8'; c.fillRect(0, 0, w, h);
+          c.strokeStyle = '#1d3f7a'; c.lineWidth = 6; c.strokeRect(4, 4, w - 8, h - 8);
+          c.fillStyle = '#1d3f7a'; c.textAlign = 'center'; c.textBaseline = 'middle';
+          let fs = 30; c.font = `bold ${fs}px Arial, sans-serif`;
+          while (c.measureText(st.name).width > w - 20 && fs > 12){ fs--; c.font = `bold ${fs}px Arial, sans-serif`; }
+          c.fillText(st.name, w/2, h/2 + 1);
+        });
+        const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.28), new THREE.MeshStandardMaterial({ map:tex, side:THREE.DoubleSide }));
+        plate.position.set(spot[0] + 0.5, 1.55, spot[1] + 0.5); plate.rotation.x = -0.25;
+        plate.userData.dyn = true;   // texture propria: non si fonde
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5, 6), pole);
+        post.position.set(spot[0] + 0.5, 0.75, spot[1] + 0.5); post.castShadow = true;
+        g.add(plate, post);
+      }
+    }
+  }
+
+  // nome della via più vicina (entro 2,5 caselle) per l'HUD
+  streetAt(x, z){
+    let best = null, bd = 2.5;
+    for (const st of this.streets || []) for (const l of st.lines) for (let i=1; i<l.length; i++){
+      const [ax, ay] = l[i-1], [bx, by] = l[i];
+      const dx = bx - ax, dy = by - ay, L = dx*dx + dy*dy || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax - 0.5) * dx + (z - ay - 0.5) * dy) / L));
+      const d = Math.hypot(x - ax - 0.5 - t*dx, z - ay - 0.5 - t*dy);
+      if (d < bd){ bd = d; best = st.name; }
+    }
+    return best;
   }
 
   dispose(){
@@ -418,6 +536,7 @@ export class World3D {
       ant.position.set(W/2 - 10 + dx, 30 + h/2 - 2, -62); g.add(ant);
       const blink = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 6), new THREE.MeshBasicMaterial({ color:0xff3020 }));
       blink.position.set(ant.position.x, ant.position.y + h/2, ant.position.z); g.add(blink);
+      blink.userData.dyn = true;
       this.animated.push({ update:(t)=>{ blink.visible = Math.sin(t*2 + dx) > 0; } });
     }
     // il Grand Hotel Campo dei Fiori, palazzone liberty in cima
@@ -575,7 +694,7 @@ export class World3D {
     }
 
     // --- edifici: componenti connesse di muri/porte/chiese ---
-    const BUILD = new Set(['#','D','C']);
+    const BUILD = new Set(['#','D','C','d']);
     for (let y=0; y<H; y++) for (let x=0; x<W; x++){
       if (!BUILD.has(getCh(x,y)) || visited.has(key(x,y))) continue;
       if (this.indoor) continue;
@@ -589,7 +708,7 @@ export class World3D {
       }
       const xs = cells.map(c=>c[0]), ys = cells.map(c=>c[1]);
       const bx0 = Math.min(...xs), bx1 = Math.max(...xs)+1, by0 = Math.min(...ys), by1 = Math.max(...ys)+1;
-      const doors = cells.filter(([cx,cy])=>getCh(cx,cy) === 'D');
+      const doors = cells.filter(([cx,cy])=>getCh(cx,cy) === 'D' || getCh(cx,cy) === 'd');
       const church = cells.some(([cx,cy])=>getCh(cx,cy) === 'C');
       const lazzaretto = tris.some(t=>t.type === 'door_event' && t.event === 'lazzaretto' && t.x >= bx0 && t.x < bx1 && t.y >= by0 && t.y < by1);
       this.building(g, bx0, by0, bx1, by1, doors, church, lazzaretto, plasterPal[(hash(bx0, by0, 80)*plasterPal.length)|0]);
@@ -703,8 +822,7 @@ export class World3D {
 
     const south = y1 - inset + 0.005;   // facciata verso la camera
     const shutter = mat(0x3d6b3c, { roughness:0.7 });   // persiane verdi, tipiche del varesotto
-    const winM = new THREE.MeshStandardMaterial({ color:0x2a3542, roughness:0.2, metalness:0.3, emissive:0xffb35a, emissiveIntensity:0 });
-    this.windows.push(winM);
+    const winM = this.winMat;
 
     // porte
     for (const [dx] of doors){
@@ -718,9 +836,8 @@ export class World3D {
       door.position.set(dx + 0.5, 0, south);
       g.add(door);
       // lampada sopra la porta
-      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), new THREE.MeshStandardMaterial({ color:0xfff0c0, emissive:0xffc070, emissiveIntensity:0.2 }));
+      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), this.lampMat);
       lamp.position.set(dx + 0.5, 1.45, south + 0.08); g.add(lamp);
-      this.lamps.push({ mesh:lamp });
     }
 
     // finestre con persiane su facciata e fianchi
@@ -752,9 +869,8 @@ export class World3D {
 
     if (church){
       // rosone e campanile (San Maurizio)
-      const rose = new THREE.Mesh(new THREE.CircleGeometry(0.32, 24), new THREE.MeshStandardMaterial({ color:0x3050a0, emissive:0x2040a0, emissiveIntensity:0.3, metalness:0.2, roughness:0.3 }));
+      const rose = new THREE.Mesh(new THREE.CircleGeometry(0.32, 24), this.roseMat);
       rose.position.set(cx, wallH - 0.6, south + 0.02); g.add(rose);
-      this.windows.push(rose.material);
       const tw = 0.9, th = wallH + 2.6;
       const tx = x1 + 0.1 - tw/2, tz = y0 + tw/2;
       addBox(g, tw, th, tw, mat(0xd9d0bf, { map:T.stone }), tx, th/2, tz);
@@ -768,6 +884,7 @@ export class World3D {
       // campana che oscilla
       const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.18, 0.25, 10), mat(0xb08d3c, { metalness:1, roughness:0.35 }));
       bell.position.set(tx, th - 0.5, tz + tw/2 + 0.01); g.add(bell);
+      bell.userData.dyn = true;
       this.animated.push({ update:t=>{ bell.rotation.x = Math.sin(t*1.5) * 0.25; } });
     }
 
@@ -786,6 +903,7 @@ export class World3D {
       addBox(g, 0.55, 0.7, 0.14, stone, cx, wallH + roofH + 0.25, south - 0.1);
       const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.13, 0.18, 10), mat(0xb08d3c, { metalness:1, roughness:0.35 }));
       bell.position.set(cx, wallH + roofH + 0.25, south - 0.02); g.add(bell);
+      bell.userData.dyn = true;
       this.animated.push({ update:t=>{ bell.rotation.x = Math.sin(t*2.2) * 0.35; } });
       const cross = new THREE.Group();
       addBox(cross, 0.04, 0.3, 0.04, mat(0x3a3530), 0, 0, 0); addBox(cross, 0.18, 0.04, 0.04, mat(0x3a3530), 0, 0.06, 0);
@@ -820,12 +938,11 @@ export class World3D {
     const iron = mat(0x1e2226, { metalness:0.7, roughness:0.4 });
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.06, 2.0, 8), iron);
     pole.position.set(cx, 1.0, cz); pole.castShadow = true; this.mapGroup.add(pole);
-    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.08, 0.28, 6), new THREE.MeshStandardMaterial({ color:0xfff4d0, emissive:0xffc070, emissiveIntensity:0.2 }));
+    const head = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.08, 0.28, 6), this.lampMat);
     head.position.set(cx, 2.1, cz); g.add(head);
     const cap = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.15, 6), iron); cap.position.set(cx, 2.3, cz); g.add(cap);
-    const light = new THREE.PointLight(0xffb870, 0, 10, 1.5);
-    light.position.set(cx, 2.0, cz); g.add(light);
-    this.lamps.push({ mesh:head, light });
+    // niente luce per ogni lampione: un piccolo gruppo di luci segue quelli vicini (vedi render)
+    this.lamps.push({ x:cx, z:cz });
   }
 
   gundam(g, cx, cz){
@@ -855,6 +972,7 @@ export class World3D {
     r.position.set(cx, 0, cz);
     r.traverse(o=>{ if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
     g.add(r);
+    this.dynMats.add(eye.material);
     this.animated.push({ update:t=>{ eye.material.emissiveIntensity = 1 + Math.sin(t*3) * 0.6; } });
   }
 
@@ -869,6 +987,7 @@ export class World3D {
     const drops = [];
     const dm = new THREE.MeshBasicMaterial({ color:0xcdefff, transparent:true, opacity:0.8 });
     for (let i=0; i<16; i++){ const d = new THREE.Mesh(new THREE.SphereGeometry(0.025, 4, 4), dm); g.add(d); drops.push(d); }
+    drops.forEach(d=>{ d.userData.dyn = true; });
     this.animated.push({ update:t=>{
       drops.forEach((d, i)=>{
         const k = (t*0.9 + i/16) % 1, a = i/16*Math.PI*2;
@@ -885,6 +1004,7 @@ export class World3D {
     const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.3), new THREE.MeshStandardMaterial({ color:0xc0392b, side:THREE.DoubleSide }));
     flag.position.set(cx+0.25, 4.3, cz); g.add(flag);
     addBox(g, 0.03, 1.0, 0.03, mat(0x333333), cx, 3.9, cz);
+    flag.userData.dyn = true;
     this.animated.push({ update:t=>{ flag.rotation.y = Math.sin(t*3)*0.3; } });
   }
 
@@ -959,6 +1079,7 @@ export class World3D {
       addBox(vg, 0.25, 1.0, 0.25, mat(0xb9b2a4, { map:T.stone }), 0, 0.5, -0.5);
       const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.12), new THREE.MeshStandardMaterial({ color:0xc0392b, side:THREE.DoubleSide }));
       fl.position.set(0.1, 1.15, -0.5); vg.add(fl);
+      fl.userData.dyn = true;
       this.animated.push({ update:t=>{ fl.rotation.y = Math.sin(t*3 + x)*0.4; } });
     } else if (kind === '5'){     // Samarate: gli hangar delle officine aeronautiche
       for (const ox of [-0.35, 0.35]){
@@ -1043,10 +1164,8 @@ export class World3D {
     this.scene.fog?.color?.set(night ? 0x1a2238 : dusk ? 0xe8b89a : 0xbfd6ea);
     if (this.water){ this.water.uniforms.sunDir.value.copy(sunPos).normalize(); this.water.uniforms.light.value = this.night ? 0.3 : dusk ? 0.75 : 1; }
     const lampOn = this.night || dusk;
-    for (const l of this.lamps){
-      l.mesh.material.emissiveIntensity = lampOn ? 3 : 0.2;
-      if (l.light) l.light.intensity = lampOn ? 14 : 0;
-    }
+    this.lampMat.emissiveIntensity = lampOn ? 3 : 0.2;
+    this.lampOn = lampOn;
     for (const w of this.windows) w.emissiveIntensity = lampOn ? 1.4 : 0;
     if (this.night) this.renderer.setClearColor(0x05060c);
   }
@@ -1107,9 +1226,11 @@ export class World3D {
     m.mesh.visible = !!text;
     m.mesh.position.set(x, h + 0.25 + Math.sin(this.clock * 3) * 0.06, z);
   }
-  bike(){
-    let b = this.actors.get('bike');
-    if (!b){ const g = makeBike(); this.mapGroup.add(g); b = { mesh:g, dispose(){} }; this.actors.set('bike', b); }
+  // il mezzo su cui si viaggia (id 'ride') o uno parcheggiato da trovare
+  vehicle(id, kind){
+    let b = this.actors.get(id);
+    if (b && b.kind !== kind){ this.mapGroup.remove(b.mesh); this.actors.delete(id); b = null; }
+    if (!b){ const g = (MAKE_VEHICLE[kind] || makeBike)(); this.mapGroup.add(g); b = { mesh:g, kind, dispose(){} }; this.actors.set(id, b); }
     b.used = true;
     return b;
   }
@@ -1161,6 +1282,7 @@ export class World3D {
     const zo = (opts.zoomOut||0) + (this.mapName === 'world' ? 4 : 0);
     const close = window.__closeup;   // solo per gli screenshot di verifica
     const offset = close ? new THREE.Vector3(0, 1.6, 2.6) : indoor ? new THREE.Vector3(0, 6.4, 6.4) : new THREE.Vector3(0, 6.6 + zo, 7.2 + zo*0.8);
+    if (!close) offset.multiplyScalar(MOBILE_ZOOM());   // su telefono la camera si allontana
     if (window.__closeup) tgt.y = 1.05;
     const k = 1 - Math.exp(-dt * 5);
     if (opts.snap){ this.camTarget.copy(tgt); } else this.camTarget.lerp(tgt, k);
@@ -1180,6 +1302,21 @@ export class World3D {
       const sc = this.sun.shadow.camera;
       sc.left = -22; sc.right = 22; sc.top = 22; sc.bottom = -22; sc.near = 1; sc.far = 120;
       sc.updateProjectionMatrix();
+    }
+
+    // luci dei lampioni: le più vicine al giocatore (ricalcolate ogni mezzo secondo)
+    if (this.lampLights?.length){
+      this._lampT = (this._lampT || 0) - dt;
+      if (this._lampT <= 0){
+        this._lampT = 0.5;
+        const cx = this.camTarget.x, cz = this.camTarget.z;
+        const near = this.lamps.map(l=>[l, (l.x - cx) ** 2 + (l.z - cz) ** 2]).sort((a, b)=>a[1] - b[1]).slice(0, this.lampLights.length);
+        this.lampLights.forEach((L, i)=>{
+          const l = near[i]?.[0];
+          if (l) L.position.set(l.x, 2, l.z);
+          L.intensity = l && this.lampOn ? 14 : 0;
+        });
+      }
     }
 
     // meteo attorno alla camera

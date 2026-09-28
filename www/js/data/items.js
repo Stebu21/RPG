@@ -12,8 +12,10 @@ export const ITEMS = {
   vernice:      { name:'Vernice Speciale', desc:'Barattolo di vernice per il Colosso del parco di Vedano.', price:0, type:'quest' },
   reliquia:     { name:'Reliquia del Cardinale', desc:'Piccola teca dorata sparita dalla Collegiata.', price:0, type:'quest' },
   // oggetti chiave
-  scarpe:       { name:'Scarpe da Corsa', desc:'Tieni premuto Shift per correre. Sempre attive.', price:300, type:'key' },
-  bici:         { name:'Bicicletta', desc:'Usala dal menu per pedalare veloce (non negli interni).', price:800, type:'key' },
+  scarpe:       { name:'Scarpe da Corsa', desc:'Corri ancora più veloce (Shift o il tasto 🏃). Sempre attive.', price:300, type:'key' },
+  bici:         { name:'Bicicletta', desc:'Premi V (o il tasto 🚲) per salire o scendere. Non negli interni.', price:800, type:'key', vehicle:true },
+  monopattino:  { name:'Monopattino Elettrico', desc:'Scatta subito e curva stretto. Premi V per salire o scendere.', price:600, type:'key', vehicle:true },
+  vespa:        { name:'Vespa', desc:'La più veloce: prende velocità piano e va di inerzia. Premi V per salire o scendere.', price:2500, type:'key', vehicle:true },
 };
 
 // Negozi per paese, divisi per reparto come in Final Fantasy. Più si va a sud
@@ -44,7 +46,7 @@ export const SHOPS = {
     magie:['tomo_folgore','rotolo_vento','spartito_ninna','manuale_urlo','tomo_curara'],
   },
   samarate: {
-    oggetti:['granpozione','elisir','etere','coda_fenice','antidoto','campana','bici'],
+    oggetti:['granpozione','elisir','etere','coda_fenice','antidoto','campana','bici','monopattino','vespa'],
     armi:['scettro_ore','masamune','ascia_titano','arpa_lago','bastone_aurora','arco_quercia'],
     abiti:['veste_astrale','armatura_shura','corazza_ferro','medaglia_eroe','ciondolo_vita'],
     magie:['tomo_incendio','rotolo_lune','tomo_curara','manuale_raffica'],
