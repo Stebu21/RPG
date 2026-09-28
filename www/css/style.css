@@ -400,3 +400,16 @@ html, body {
 #fast-travel .ft-none { width:100%; text-align:center; font-size:12px; color:#9aa3c7; }
 #fast-travel .btn { min-width:140px; }
 #fast-travel .btn:disabled { opacity:.5; }
+
+/* obiettivo principale: freccia verso la meta (o verso l'uscita giusta) */
+#hud-objective {
+  position:absolute; top:50px; left:10px; z-index:10; max-width:min(420px, calc(100vw - 110px));
+  display:flex; align-items:center; gap:8px;
+  background:var(--glass); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+  border:1px solid rgba(255,215,106,.45); border-radius:999px;
+  padding:5px 14px 5px 8px; font-size:12px; font-weight:600; color:#ffe9a8; pointer-events:none;
+}
+#hud-objective.hidden { display:none; }
+#hud-objective .obj-arrow { flex:none; transition:transform .15s linear; filter:drop-shadow(0 0 4px rgba(255,215,106,.6)); }
+#hud-objective .obj-text { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media (pointer:coarse){ #autosave-toast { top:92px; } }

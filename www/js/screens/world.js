@@ -599,6 +599,73 @@ window.addEventListener('keydown', e=>{
   cv.addEventListener('touchend', e=>{ if (e.touches.length < 2) pinch = null; }, { passive:true });
 }
 
+// ---------- obiettivo principale ----------
+// La prossima tappa della trama (dai flag della partita) e, se è in un'altra mappa, l'uscita
+// da prendere per avvicinarsi: percorso minimo sul grafo dei passaggi tra le mappe.
+const STORY_GOALS = [
+  { flag:'intro_done',       map:'accademia',  label:'Rettore Cid, all’Accademia', near:t=>t.npc === 'rettore_cid' },
+  { flag:'sigillo_alba',     map:'vedano',     label:'Chiesa del Lazzaretto', near:t=>t.event === 'lazzaretto' },
+  { flag:'sigillo_meriggio', map:'castiglione', label:'Collegiata di Castiglione', near:t=>t.event === 'collegiata' },
+  { flag:'sigillo_vespro',   map:'jerago',     label:'Castello di Jerago', near:t=>t.event === 'castello' },
+  { flag:'sigillo_notte',    map:'samarate',   label:'Officine di Samarate', near:t=>t.event === 'officina' },
+  { flag:'game_done',        map:'sacromonte', label:'Santuario del Sacro Monte: Eterna', near:t=>t.event === 'finale' },
+];
+export function currentGoal(){
+  const f = G.s.flags;
+  const g = STORY_GOALS.find(g=>!f[g.flag]);
+  if (!g || !MAPS[g.map]) return null;
+  const t = MAPS[g.map].triggers.find(g.near);
+  return t ? { label:g.label, map:g.map, x:t.x, y:t.y } : null;
+}
+const routeCache = new Map();
+// prima mappa dopo `from` sulla strada più breve verso `to` (portali bloccati compresi: la trama li apre)
+function nextMapTowards(from, to){
+  const key = from + '>' + to;
+  if (routeCache.has(key)) return routeCache.get(key);
+  const prev = new Map([[from, null]]), q = [from];
+  while (q.length){
+    const m = q.shift();
+    if (m === to) break;
+    for (const t of MAPS[m]?.triggers || []) if (t.type === 'portal' && MAPS[t.to?.map] && !prev.has(t.to.map)){ prev.set(t.to.map, m); q.push(t.to.map); }
+  }
+  let step = prev.has(to) ? to : null;
+  while (step && prev.get(step) !== from) step = prev.get(step);
+  routeCache.set(key, step);
+  return step;
+}
+// punto da raggiungere nella mappa attuale: la meta stessa o il passaggio più vicino verso di lei
+export function goalWaypoint(){
+  const goal = currentGoal();
+  if (!goal) return null;
+  if (goal.map === G.s.map) return { ...goal, exit:false };
+  const next = nextMapTowards(G.s.map, goal.map);
+  if (!next) return null;
+  let best = null, bd = Infinity;
+  for (const t of map.triggers) if (t.type === 'portal' && t.to.map === next){
+    const d = (t.x - player.px) ** 2 + (t.y - player.pz) ** 2;
+    if (d < bd){ bd = d; best = t; }
+  }
+  return best && { label:goal.label, map:goal.map, x:best.x, y:best.y, exit:true, via:MAPS[next].name };
+}
+const objEl = document.getElementById('hud-objective');
+const objArrow = objEl.querySelector('.obj-arrow'), objText = objEl.querySelector('.obj-text');
+let objT = 0, objWp = null;
+function updateObjective(dt){
+  objT -= dt;
+  if (objT <= 0){ objT = 0.25; objWp = goalWaypoint(); }
+  objEl.classList.toggle('hidden', !objWp);
+  if (!objWp) return;
+  const dx = objWp.x + 0.5 - player.px, dz = objWp.y + 0.5 - player.pz, d = Math.hypot(dx, dz);
+  // la camera guarda sempre verso nord: sullo schermo "su" è -z
+  objArrow.style.transform = `rotate(${Math.atan2(dx, -dz)}rad)`;
+  const dist = d < 1.6 ? 'qui!' : map.osm ? `${Math.round(d * 6 / 10) * 10} m` : `${Math.round(d)} passi`;
+  const bus = map.osm && d * 6 > 500 && map.triggers.some(t=>t.type === 'stop') ? ' · 🚌 c’è l’autobus' : '';   // lontano: meglio la fermata
+  const txt = (objWp.exit ? `${objWp.label} · verso ${objWp.via} · ${dist}` : `${objWp.label} · ${dist}`) + bus;
+  if (objText.textContent !== txt) objText.textContent = txt;
+  // sul posto: colonna di luce e stella (solo per la meta vera, non per le uscite)
+  if (!objWp.exit) W3.beacon('goal', objWp.x + 0.5, objWp.y + 0.5);
+}
+
 // ---------- viaggio rapido ----------
 // verso l'ingresso di un paese già visitato (dal menu Mappa)
 export function visitedTowns(){ return Object.keys(G.s.visited || {}).filter(k=>MAPS[k]?.osm); }
@@ -870,6 +937,7 @@ function render(dt){
     if (hudLoc.textContent !== txt) hudLoc.textContent = txt;
   }
 
+  updateObjective(dt);
   W3.endActors();
   W3.render(dt, { x:player.px, z:player.pz }, {
     snap: snapCam && !(snapCam = false),

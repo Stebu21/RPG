@@ -1397,6 +1397,29 @@ export class World3D {
     for (const [id, a] of this.actors) if (!a.used){ this.mapGroup.remove(a.mesh); a.dispose(); this.actors.delete(id); }
   }
 
+  // segnale dell'obiettivo: colonna di luce che pulsa e anello a terra, visibili da lontano
+  beacon(id, x, z){
+    const key = 'beacon:' + id;
+    let b = this.actors.get(key);
+    if (!b){
+      const grp = new THREE.Group();
+      const beamM = new THREE.MeshBasicMaterial({ color:0xffd76a, transparent:true, opacity:0.28, depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide });
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.45, 7, 20, 1, true), beamM); beam.position.y = 3.5; grp.add(beam);
+      const ringM = new THREE.MeshBasicMaterial({ color:0xffe9a8, transparent:true, opacity:0.8, depthWrite:false, blending:THREE.AdditiveBlending });
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.52, 32), ringM); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.04; grp.add(ring);
+      grp.traverse(o=>{ o.castShadow = false; o.receiveShadow = false; });
+      this.mapGroup.add(grp);
+      b = { mesh:grp, beam, ring, dispose(){ beam.geometry.dispose(); ring.geometry.dispose(); beamM.dispose(); ringM.dispose(); } };
+      this.actors.set(key, b);
+    }
+    b.used = true;
+    const t = this.clock;
+    b.mesh.position.set(x, 0, z);
+    b.beam.material.opacity = 0.2 + Math.sin(t * 3) * 0.08;
+    const k = 1 + (t % 1.6) / 1.6 * 0.8; b.ring.scale.set(k, k, 1); b.ring.material.opacity = 0.8 * (1 - (t % 1.6) / 1.6);
+    return b;
+  }
+
   // palina dell'autobus: palo, cartello blu con la scritta BUS, pensilina con panca
   busStop(id, x, y){
     let b = this.actors.get(id);
