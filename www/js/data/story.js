@@ -21,18 +21,6 @@ export const NPCS = {
     { name:'Abitante', lines:['Una casa col camino acceso è il miglior rifugio quando le ore ballano.',
                               'Restate quanto volete, ma non toccate la credenza.'] },
   ],
-  // --- abitanti delle case generate (una per porta dei paesi OSM) ---
-  residente0: [{ name:'Signora', lines:['Oh, visite! Pulitevi le scarpe, ho appena lavato per terra.', 'Da quando le ore sono impazzite il mio orologio a cucù canta a mezzanotte e a mezzogiorno insieme.'] }],
-  residente1: [{ name:'Pensionato', lines:['Ai miei tempi la corriera per Varese passava puntuale. Adesso passa quando vuole il tempo.'] }],
-  residente2: [{ name:'Studente', lines:['Sto preparando l’esame, ma il libro cambia capitolo da solo ogni ora. Fantastico.', 'Se vedete la strega, ditele che mi deve una sessione.'] }],
-  residente3: [{ if:{ has:['sigillo_alba'] }, name:'Nonno', lines:['Dicono che avete già un Sigillo delle Ore. Bravi ragazzi, fateci tornare le giornate normali.'] },
-               { name:'Nonno', lines:['Sedetevi, sedetevi. Una caramella alla menta? Sono buonissime, anche se hanno quarant’anni.'] }],
-  residente4: [{ name:'Mamma', lines:['Non fate rumore, il piccolo dorme! ...Ah no, è sveglio. Da tre giorni. Colpa del tempo.'] }],
-  residente5: [{ name:'Ciclista', lines:['Se trovate una bici in giro, prendetela: tra un paese e l’altro si fa prima.', 'E con le Scarpe da Corsa, tieni premuto B e vai come il vento!'] }],
-  residente6: [{ name:'Cuoca', lines:['Sentite che profumo? Risotto con la luganega. Peccato che la pentola continui a tornare cruda.'] }],
-  residente7: [{ name:'Artigiano', lines:['Ripariamo di tutto, qui. Tranne gli orologi: quelli adesso fanno come vogliono.'] }],
-  residente8: [{ name:'Ragazza', lines:['Avete visto il cavallo del castello di Jerago? Dicono che lo lascino cavalcare a chi ha buon cuore.'] }],
-  residente9: [{ name:'Vicino', lines:['Siete i ragazzi dell’Accademia? Buona fortuna. E chiudete il portone uscendo, grazie.'] }],
   bottegaio: [
     { name:'Bottegaio', lines:['Benvenuti nella mia bottega! Avvicinatevi al bancone per vedere la merce.'] },
   ],

@@ -280,6 +280,7 @@ function build(name, cfg, data){
   // 8) lampioni e panchine lungo le vie
   for (let ty = 1; ty < H - 1; ty++) for (let tx = 1; tx < W - 1; tx++){
     if (g[ty][tx] !== '.') continue;
+    if ('dD'.includes(g[ty - 1][tx]) || 'dD'.includes(g[ty + 1][tx]) || 'dD'.includes(g[ty][tx - 1]) || 'dD'.includes(g[ty][tx + 1])) continue;   // mai davanti a una porta
     const nearRoad = g[ty][tx - 1] === '=' || g[ty][tx + 1] === '=' || g[ty - 1][tx] === '=' || g[ty + 1][tx] === '=';
     if (nearRoad && (tx * 7 + ty * 13) % 23 === 0) g[ty][tx] = 'P';
     else if (!nearRoad && g[ty+1][tx] === ':' && (tx * 5 + ty * 3) % 29 === 0) g[ty][tx] = 'b';

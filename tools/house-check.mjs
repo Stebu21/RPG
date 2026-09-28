@@ -1,4 +1,4 @@
-// Case visitabili e muri: ogni porta dei paesi OSM porta a un interno e ritorno;
+// Porte e muri: si entra solo negli edifici della storia (ogni porta porta a un interno e ritorno);
 // camminando a caso (a piedi, di corsa, a cavallo, in Vespa) non si entra mai nei muri.
 // uso: node tools/house-check.mjs
 import http from 'node:http';
@@ -52,22 +52,33 @@ const report = await ev(async ()=>{
       if (t.type !== 'portal') return;
       const inn = MAPS[t.to.map]; if (!inn){ bad.push(`mappa mancante ${t.to.map}`); return; }
       if (BLOCKED.has(inn.tiles[t.to.y][t.to.x])) bad.push(`ingresso nel muro ${t.to.map}`);
-      if (t.to.map.includes('_int_')){
+      if (inn.indoor){
         const ex = inn.triggers.find(e=>e.type === 'portal');
         const [fx, fy] = [ex.to.x, ex.to.y];
         if (BLOCKED.has(m.tiles[fy][fx]) || trig.has(fx + ',' + fy)) bad.push(`uscita bloccata ${t.to.map}`);
         if (Math.abs(fx - x) + Math.abs(fy - y) !== 1) bad.push(`uscita lontana dalla porta ${t.to.map}`);
       }
     }));
-    const houses = m.triggers.filter(t=>t.to?.map?.includes('_int_'));
-    out[town] = { doors, houses:houses.length, bad:bad.slice(0, 5), nbad:bad.length, sample:houses.filter((_, i)=>i % 97 === 5).slice(0, 3) };
+    const houses = m.triggers.filter(t=>t.type === 'portal' && MAPS[t.to?.map]?.indoor);
+    out[town] = { doors, houses:houses.length, bad:bad.slice(0, 5), nbad:bad.length, sample:houses.slice(0, 3),
+                  generic:Object.keys(MAPS).filter(k=>k.startsWith(town + '_int_')).length, plain:m.tiles.join('').split('d').length - 1 };
   }
   return out;
 });
 for (const [town, r] of Object.entries(report)){
-  console.log(town, 'porte', r.doors, 'case generate', r.houses, 'problemi', r.nbad, r.bad.join(' | '));
+  console.log(town, 'porte', r.doors, 'edifici visitabili', r.houses, 'problemi', r.nbad, r.bad.join(' | '));
   assert.equal(r.nbad, 0, town);
+  assert.equal(r.generic + r.plain, 0, `${town}: ci sono ancora case comuni con la porta`);
+  assert.ok(r.houses >= 4 && r.houses <= 12, `${town}: edifici visitabili fuori misura`);
 }
+
+// 1b) salvataggio fatto dentro una casa comune (versione precedente): si riparte davanti alla sua porta
+await ev(async ()=>{ const { G } = await import('./js/engine/state.js'); G.s.map = 'vedano_int_193_14'; G.s.x = 5; G.s.y = 5; });
+await ev(async ()=>{ const { show } = await import('./js/engine/ui.js'); show('world'); });
+await wait(800); await skip();
+const moved = await ev(async ()=>{ const { G } = await import('./js/engine/state.js'); return [G.s.map, G.s.x, G.s.y]; });
+console.log('salvataggio in una casa tolta ->', moved.join(','));
+assert.equal(moved[0], 'vedano');
 
 // 2) entrare e uscire davvero da qualche casa di ogni paese, camminando
 const step = async (key, ms)=>{ await page.keyboard.down(key); await wait(ms); await page.keyboard.up(key); await wait(150); };
@@ -77,7 +88,11 @@ for (const [town, r] of Object.entries(report)){
   for (const t of r.sample){
     const exit = await ev(async (mid)=>{ const { MAPS } = await import('./js/data/maps.js'); return MAPS[mid].triggers.find(e=>e.type === 'portal').to; }, t.to.map);
     await go(town, exit.x, exit.y); await wait(700); await skip();
-    await step(KEY[`${t.x - exit.x},${t.y - exit.y}`], 700); await skip();
+    // verso la porta, rilasciando il tasto appena si è dentro (altrimenti si arriva al bancone)
+    const k = KEY[`${t.x - exit.x},${t.y - exit.y}`];
+    await page.keyboard.down(k);
+    for (let i = 0; i < 40 && (await ev(async ()=>(await import('./js/engine/state.js')).G.s.map)) === town; i++) await wait(40);
+    await page.keyboard.up(k); await wait(150); await skip();
     const inside = await ev(async ()=>(await import('./js/engine/state.js')).G.s.map);
     assert.equal(inside, t.to.map, `non si entra nella casa ${t.to.map}`);
     const name = await page.$eval('#hud-location', e=>e.textContent);

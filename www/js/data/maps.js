@@ -383,7 +383,6 @@ const INTERNI = {
     ],
     exit:[[4,6],[5,6]],
     npcs:[{ x:7, y:3, npc:'abitante' }],
-    chest:[6,2],
   },
   negozio: {
     tiles:[
@@ -411,38 +410,6 @@ const INTERNI = {
     ],
     exit:[[5,7],[6,7]],
     npcs:[{ x:6, y:1, npc:'oste', sprite:'#b06a4a' }],
-  },
-  // interni generati per le case dei paesi OSM
-  appartamento: {
-    tiles:[
-      'MMMMMMMMMMMM',
-      'MZZwwwMllwwM',
-      'MwwwwwMllwwM',
-      'MwOOwwwwwwwM',
-      'MwOOwwMwwZZM',
-      'MwwwwwMwwwwM',
-      'MwwwwRRwwwwM',
-      'MMMMMwwMMMMM',
-    ],
-    exit:[[5,7],[6,7]],
-    npcs:[{ x:8, y:5 }],
-    chest:[4,1],
-  },
-  capannone: {
-    tiles:[
-      'MMMMMMMMMMMMMM',
-      'MKKKwwwwwwKKKM',
-      'MwwwwwwwwwwwwM',
-      'MwwOOwwwwOOwwM',
-      'MwwOOwwwwOOwwM',
-      'MwwwwwwwwwwwwM',
-      'MZZwwwwwwwwZZM',
-      'MwwwwwRRwwwwwM',
-      'MMMMMMwwMMMMMM',
-    ],
-    exit:[[6,8],[7,8]],
-    npcs:[{ x:7, y:2 }],
-    chest:[5,2],
   },
   chiesa: {
     tiles:[
@@ -520,10 +487,6 @@ MAPS.chiesa_samarate  = chiesaDi('Chiesa della SS. Trinità', { map:'samarate', 
 // ---------- paesi reali da OpenStreetMap ----------
 // Le mappe generate da tools/osm-town.mjs sostituiscono quelle disegnate a
 // mano; porte, personaggi e oggetti vengono agganciati agli edifici veri.
-// Case visitabili: dietro ogni porta dei paesi OSM c'è un interno. Tipo, abitante ed
-// eventuale forziere dipendono dalla posizione, così la stessa porta porta sempre allo stesso posto.
-const RESIDENTI = 10;
-const LOOT = ['pozione', 'pozione', 'etere', 'antidoto'];
 // via più vicina a una casella (nomi di case e fermate)
 function streetNear(streets, x, y){
   let best = null, bd = 64;
@@ -536,47 +499,6 @@ function streetNear(streets, x, y){
   }
   return best;
 }
-function houses(town, tiles, streets, list){
-  const at = (x, y)=>tiles[y]?.[x] ?? ' ';
-  const has = new Set(list.map(t=>t.x + ',' + t.y));
-  const BUILDING = '#DCW';
-  const walk = c=>'.,F=:B'.includes(c);
-  const seed = (x, y, k)=>(((x * 73856093) ^ (y * 19349663) ^ (k * 83492791)) >>> 0) % 1000 / 1000;
-  // dimensione del blocco di case (per scegliere casa, condominio o capannone)
-  const size = new Map();
-  const blockSize = (x0, y0)=>{
-    const k0 = x0 + ',' + y0;
-    if (size.has(k0)) return size.get(k0);
-    const seen = new Set([k0]), st = [[x0, y0]];
-    while (st.length){
-      const [x, y] = st.pop();
-      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
-        const k = (x + dx) + ',' + (y + dy);
-        if (!seen.has(k) && BUILDING.includes(at(x + dx, y + dy))){ seen.add(k); st.push([x + dx, y + dy]); }
-      }
-    }
-    for (const k of seen) size.set(k, seen.size);
-    return seen.size;
-  };
-  for (let y = 0; y < tiles.length; y++) for (let x = 0; x < tiles[y].length; x++){
-    if (at(x, y) !== 'D' || has.has(x + ',' + y)) continue;
-    const front = [[0, 1], [-1, 0], [1, 0], [0, -1]].map(([dx, dy])=>[x + dx, y + dy]).find(([fx, fy])=>walk(at(fx, fy)));
-    if (!front){ tiles[y] = tiles[y].slice(0, x) + '#' + tiles[y].slice(x + 1); continue; }   // porta murata: non ci si arriva
-    const n = blockSize(x, y);
-    const kind = n > 60 && (town === 'samarate' || town === 'jerago') ? 'capannone' : n > 12 ? 'appartamento' : 'casa';
-    const via = streetNear(streets, x, y);
-    const label = { casa:'Casa', appartamento:'Condominio', capannone:'Capannone' }[kind];
-    const T = INTERNI[kind], mid = `${town}_int_${x}_${y}`;
-    const [ex, ey] = T.exit[0];
-    const triggers = T.exit.map(([tx, ty])=>({ x:tx, y:ty, type:'portal', to:{ map:town, x:front[0], y:front[1] } }));
-    if (seed(x, y, 1) < 0.75) for (const p of T.npcs)
-      triggers.push({ x:p.x, y:p.y, type:'npc', npc:'residente' + Math.floor(seed(x, y, 2) * RESIDENTI), sprite:['#b08968','#8a7a66','#c97a5a','#6a8fb5','#b56a8f','#9b8a6a'][Math.floor(seed(x, y, 3) * 6)] });
-    if (seed(x, y, 4) < 0.15) triggers.push({ x:T.chest[0], y:T.chest[1], type:'chest', id:mid, item:LOOT[Math.floor(seed(x, y, 5) * LOOT.length)], qty:1 });
-    MAPS[mid] = { name: via ? `${label} in ${via}` : label, music:'town', town:true, indoor:true, tiles:T.tiles, triggers };
-    list.push({ x, y, type:'portal', to:{ map:mid, x:ex, y:ey - 1 } });
-  }
-}
-
 // Fermate dell'autobus: una all'ingresso e una vicino a ogni luogo importante. Da una fermata
 // si va subito alle altre dello stesso paese (i paesi veri sono grandi: così non si cammina per chilometri).
 const STOP_NAMES = { entry:'Ingresso del paese', chiesa:'Chiesa', lazzaretto:'Chiesa del Lazzaretto', collegiata:'Collegiata',
@@ -612,8 +534,9 @@ function osmTown(id, name, worldAt, place){
   for (const [x, y] of P.entry.portals) list.push({ x, y, type:'portal', to:{ map:'world', ...worldAt } });
   place(H);
   busStops(P, list, t.tiles, t.streets);
-  const tiles = t.tiles.map(r=>r.replace(/d/g, 'D'));   // ogni porta si apre
-  houses(id, tiles, t.streets, list);
+  // si entra solo negli edifici della storia (porte vere 'D'); le altre case restano senza porta
+  const doorAt = new Set(list.filter(t=>t.type === 'portal' || t.type === 'door_event').map(t=>t.x + ',' + t.y));
+  const tiles = t.tiles.map((r, y)=>r.replace(/[dD]/g, (c, x)=>c === 'D' && doorAt.has(x + ',' + y) ? 'D' : '#'));   // porte che non portano da nessuna parte: murate
   MAPS[id] = { name, music:'town', town:true, tiles, streets:t.streets, triggers:list, osm:true,
                spawn:{ x:P.entry.spawn[0], y:P.entry.spawn[1] } };
   // la mappa del mondo porta all'ingresso vero del paese

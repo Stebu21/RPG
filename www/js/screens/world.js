@@ -892,6 +892,12 @@ registerScreen('world', {
   enter(params){
     G.s.quests ||= {};  // compatibilità con i salvataggi precedenti
     migrate(G.s);
+    if (!MAPS[G.s.map]){
+      // salvataggio dentro una casa comune che non esiste più: si riparte davanti alla sua porta
+      const [town, x, y] = G.s.map.split(/_int_|_/);
+      if (MAPS[town]){ G.s.map = town; G.s.x = +x; G.s.y = +y + 1; }
+      else { G.s.map = 'varese'; G.s.x = MAPS.varese.spawn.x; G.s.y = MAPS.varese.spawn.y; }
+    }
     if (!params?.resume){
       map = MAPS[G.s.map];
       player = newPlayer(G.s.x, G.s.y);
