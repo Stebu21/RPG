@@ -1,5 +1,5 @@
 // Salvataggi online (Supabase). Vuoti = solo sul dispositivo.
-// La chiave anon è pubblica per natura: i dati sono protetti dalle funzioni in supabase/schema.sql.
+// La chiave anon è pubblica per natura: i dati sono protetti dalle funzioni in supabase/migrations.
 // In sviluppo (http://localhost, dove girano anche i test) si resta offline per non sporcare
 // il database vero; l'app Android (https://localhost) e il sito pubblicato usano Supabase.
 const DEV = location.protocol === 'http:' && /^(localhost|127\.0\.0\.1)$/.test(location.hostname);

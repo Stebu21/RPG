@@ -98,11 +98,27 @@ export async function login(name, pin){
   return { ok:true, name:local.name };
 }
 
-export function logout(){ session = null; }
+export function logout(){ session = null; pending.clear(); }
 
+// invio di uno slot; se la rete manca resta in coda e riparte appena torna la connessione
+const pending = new Set();
 function push(slot, sv){
-  if (CLOUD && session) rpc('rpg_save', { p_name:session.key, p_pin:session.pin, p_slot:slot, p_data:sv });
+  if (!CLOUD || !session) return;
+  const who = session.key;
+  pending.add(slot);
+  rpc('rpg_save', { p_name:who, p_pin:session.pin, p_slot:slot, p_data:sv }).then(r=>{
+    if (!r?.ok || session?.key !== who) return;
+    // nel frattempo lo slot può essere stato risalvato: in coda resta solo se è cambiato
+    if (loadAll()[who]?.saves?.[slot]?.time === sv.time) pending.delete(slot);
+    else flush();
+  });
 }
+function flush(){
+  if (!session) return;
+  const saves = loadAll()[session.key]?.saves || [];
+  for (const slot of [...pending]) if (saves[slot]) push(slot, saves[slot]);
+}
+if (CLOUD) window.addEventListener('online', flush);
 
 export function listSaves(name){
   const acc = loadAll()[(name||'').toLowerCase()];

@@ -1,0 +1,3 @@
+# Progetto Supabase del gioco: le migrazioni in supabase/migrations vengono applicate
+# dall'integrazione GitHub di Supabase a ogni push sul ramo principale.
+project_id = "rpg"

@@ -1,5 +1,6 @@
 -- The Menace of Eterna: account e salvataggi online.
--- Da incollare una volta in Supabase → SQL Editor → Run.
+-- Migrazione applicata da Supabase a ogni push su master (integrazione GitHub): è ripetibile,
+-- non tocca i dati già salvati.
 -- La tabella non è leggibile dal browser: si passa solo da queste funzioni, che controllano il PIN.
 
 create extension if not exists pgcrypto with schema extensions;

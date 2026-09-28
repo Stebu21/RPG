@@ -10,7 +10,7 @@ const ROOT = new URL('../www', import.meta.url).pathname.replace(/^\/([A-Za-z]:)
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css' };
 let cloud = true, offline = false;
 const db = {}, calls = [];
-// stesse risposte delle funzioni in supabase/schema.sql
+// stesse risposte delle funzioni in supabase/migrations
 const RPC = {
   rpg_register({ p_name, p_pin, p_saves }){
     const k = p_name.toLowerCase();
@@ -59,9 +59,11 @@ const device = async (clear=true)=>{
   if (clear){ await page.evaluate(()=>localStorage.clear()); await page.reload({ waitUntil:'networkidle0' }); }
 };
 const auth = async (btn, name, pin)=>{
-  await page.$eval('#auth-name', e=>e.value = ''); await page.$eval('#auth-pin', e=>e.value = '');
-  await page.type('#auth-name', name); await page.type('#auth-pin', pin);
-  await page.click(btn);
+  // ponytail: campi e pulsante dalla pagina: gli eventi simulati di puppeteer a volte si perdono dopo i reload
+  await page.evaluate((btn, name, pin)=>{
+    document.getElementById('auth-name').value = name; document.getElementById('auth-pin').value = pin;
+    document.querySelector(btn).click();
+  }, btn, name, pin);
   await page.waitForFunction(()=>!document.getElementById('save-box').classList.contains('hidden') || !/Connessione/.test(document.getElementById('auth-msg').textContent));
   return page.$eval('#save-box', e=>!e.classList.contains('hidden'));
 };
@@ -92,12 +94,21 @@ assert.equal(await auth('#btn-login', 'Ale', 'sbagliato'), false);
 assert.match(await page.$eval('#auth-msg', e=>e.textContent), /PIN errato/);
 assert.ok(await auth('#btn-login', 'ale', 'ciao'));
 assert.match((await slots())[0], /Riki/, 'la partita non compare sul secondo dispositivo');
-await page.click('#btn-logout');
+// salvataggio senza rete: resta in coda e parte appena torna la connessione
+offline = true;
+await page.evaluate(async ()=>{ const { saveGame } = await import('./js/engine/save.js'); saveGame('Ale', 2, { map:'vedano' }, { label:'senza rete' }); });
+await wait(300);
+assert.equal(db.ale.saves[2], null);
+offline = false;
+await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+await wait(300);
+assert.equal(db.ale.saves[2]?.meta?.label, 'senza rete', 'il salvataggio fatto offline non è arrivato');
+await page.$eval('#btn-logout', e=>e.click());
 
 // senza rete: si entra con la copia locale
 offline = true;
 assert.ok(await auth('#btn-login', 'Ale', 'ciao'));
-await page.click('#btn-logout');
+await page.$eval('#btn-logout', e=>e.click());
 offline = false;
 
 // account vecchio, creato solo sul dispositivo: al primo accesso online viene caricato
