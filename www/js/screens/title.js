@@ -1,6 +1,6 @@
 // Titolo: account (registrazione/login) e slot di salvataggio.
 
-import { register, login, listSaves, loadGame, SLOTS } from '../engine/save.js';
+import { register, login, logout, listSaves, loadGame, SLOTS } from '../engine/save.js';
 import { G, newGame, migrate, regen, DUO } from '../engine/state.js';
 import { CHARACTERS } from '../data/characters.js';
 import { drawPortrait } from '../engine/sprites.js';
@@ -105,24 +105,22 @@ function startLoaded(slot){
 }
 
 export function initTitle(){
-  document.getElementById('btn-register').addEventListener('click', ()=>{
-    const r = register(nameIn.value, pinIn.value);
+  // registrazione e accesso possono passare dal server: pulsanti fermi finché risponde
+  let waiting = false;
+  const auth = fn=>async ()=>{
+    if (waiting) return;
+    waiting = true; msg('Connessione…');
+    const r = await fn(nameIn.value, pinIn.value);
+    waiting = false;
     if (!r.ok){ sfx('cancel'); msg(r.msg, true); return; }
     sfx('confirm');
     G.account = r.name;
     authBox.classList.add('hidden');
     saveBox.classList.remove('hidden');
     renderSlots();
-  });
-  document.getElementById('btn-login').addEventListener('click', ()=>{
-    const r = login(nameIn.value, pinIn.value);
-    if (!r.ok){ sfx('cancel'); msg(r.msg, true); return; }
-    sfx('confirm');
-    G.account = r.name;
-    authBox.classList.add('hidden');
-    saveBox.classList.remove('hidden');
-    renderSlots();
-  });
+  };
+  document.getElementById('btn-register').addEventListener('click', auth(register));
+  document.getElementById('btn-login').addEventListener('click', auth(login));
   // Invio nei campi: passa al PIN o accedi direttamente
   nameIn.addEventListener('keydown', e=>{ if (e.key === 'Enter') pinIn.focus(); });
   pinIn.addEventListener('keydown', e=>{ if (e.key === 'Enter') document.getElementById('btn-login').click(); });
@@ -133,6 +131,7 @@ export function initTitle(){
   });
   document.getElementById('btn-logout').addEventListener('click', ()=>{
     sfx('cancel');
+    logout();
     G.account = null;
     saveBox.classList.add('hidden');
     authBox.classList.remove('hidden');
