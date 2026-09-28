@@ -1,7 +1,7 @@
 {
   "name": "hourbreakers",
   "version": "1.0.0",
-  "description": "Hourbreakers — RPG in italiano ambientato nella provincia di Varese",
+  "description": "The Menace of Eterna — RPG in italiano ambientato nella provincia di Varese",
   "main": "index.js",
   "directories": {
     "doc": "docs"

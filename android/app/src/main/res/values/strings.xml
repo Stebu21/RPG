@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Hourbreakers</string>
-    <string name="title_activity_main">Hourbreakers</string>
+    <string name="app_name">The Menace of Eterna</string>
+    <string name="title_activity_main">The Menace of Eterna</string>
     <string name="package_name">it.cronache.varese</string>
     <string name="custom_url_scheme">it.cronache.varese</string>
 </resources>
