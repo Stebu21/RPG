@@ -2,12 +2,13 @@
 // visibili insieme, animazioni (affondo, colpo, magia, KO), comandi e Limit.
 
 import { MONSTERS } from '../data/monsters.js';
+import { QUESTS, registerKill } from '../data/quests.js';
 import { ABILITIES, STATUS_NAMES } from '../data/abilities.js';
 import { CHARACTERS } from '../data/characters.js';
 import { ITEMS } from '../data/items.js';
 import { G, statsOf, knownAbilities, gainExp, abilityName } from '../engine/state.js';
 import { drawMonster, drawActor, TILE } from '../engine/sprites.js';
-import { playMusic, sfx } from '../engine/audio.js';
+import { playMusic, stopMusic, sfx } from '../engine/audio.js';
 import { registerScreen, show, currentScreen } from '../engine/ui.js';
 
 const el = document.getElementById('screen-battle');
@@ -84,10 +85,12 @@ const A_LAYOUT = {
 
 function buildScene(){
   const W = zone.clientWidth || 800, H = zone.clientHeight || 360;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  canvas.width = W * dpr; canvas.height = H * dpr;
+  // risoluzione interna dimezzata + upscale pixelato = look da Nintendo DS
+  const dpr = 0.5;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
   canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
   sceneCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  sceneCtx.imageSmoothingEnabled = false;
   B.W = W; B.H = H;
 
   const eLay = E_LAYOUT[Math.min(4, B.enemies.length)] || E_LAYOUT[4];
@@ -111,38 +114,187 @@ function refreshEnemySprite(e){
   e.sprite = cv;
 }
 
-function animate(u, kind){
+function animate(u, kind, target){
   if (kind === 'lunge'){ u.lungeT = 0.42; }
+  else if (kind === 'dash' && target){
+    // corsa verso il bersaglio in stile FF9: vai, colpisci, torna
+    u.dashT = 0.72; u.dashDur = 0.72;
+    const side = u.kind === 'ally' ? 1 : -1;
+    u.dashGoal = { x: target.sx + side * target.size * 0.55 - u.sx,
+                   y: target.sy - u.sy };
+  }
   else if (kind === 'hit'){ u.shakeT = 0.34; u.flashT = 0.26; }
   else if (kind === 'cast'){ u.castT = 0.55; }
 }
+
+// ---------- sfondi di battaglia per zona (stile FF9) ----------
+function ridge(x, W, H, frac, color, jag=0.05){
+  x.fillStyle = color;
+  x.beginPath();
+  x.moveTo(0, H*0.62);
+  for (let i=0; i<=10; i++){
+    x.lineTo(W*i/10, H*frac + Math.sin(i*2.7 + frac*40)*H*jag);
+  }
+  x.lineTo(W, H*0.62);
+  x.closePath(); x.fill();
+}
+function bgSky(x, W, H, top, bottom){
+  const g = x.createLinearGradient(0, 0, 0, H*0.62);
+  g.addColorStop(0, top); g.addColorStop(1, bottom);
+  x.fillStyle = g; x.fillRect(0, 0, W, H*0.62);
+}
+function bgGround(x, W, H, top, bottom){
+  const g = x.createLinearGradient(0, H*0.62, 0, H);
+  g.addColorStop(0, top); g.addColorStop(1, bottom);
+  x.fillStyle = g; x.fillRect(0, H*0.62, W, H*0.38);
+  x.fillStyle = 'rgba(255,255,255,.06)';
+  x.beginPath(); x.ellipse(W*0.5, H*0.78, W*0.42, H*0.16, 0, 0, Math.PI*2); x.fill();
+}
+function bgSun(x, cx, cy, r, color){
+  x.save(); x.shadowColor = color; x.shadowBlur = 22;
+  x.fillStyle = color;
+  x.beginPath(); x.arc(cx, cy, r, 0, Math.PI*2); x.fill();
+  x.restore();
+}
+function bgClouds(x, W, H, t, color){
+  x.fillStyle = color;
+  for (let i=0; i<3; i++){
+    const cx = ((t*(8+i*5) + i*420) % (W+320)) - 160;
+    const cy = H*(0.10 + i*0.08);
+    x.beginPath();
+    x.ellipse(cx, cy, 62+i*16, 15+i*4, 0, 0, Math.PI*2);
+    x.ellipse(cx+36, cy+5, 40, 12, 0, 0, Math.PI*2);
+    x.fill();
+  }
+}
+function bgTower(x, bx, by, w, h, color, merli=false){
+  x.fillStyle = color;
+  x.fillRect(bx, by-h, w, h);
+  if (merli){
+    for (let i=0; i<w; i+=w/4) x.fillRect(bx+i, by-h-5, w/7, 5);
+  } else {
+    x.beginPath(); x.moveTo(bx-2, by-h); x.lineTo(bx+w/2, by-h-12); x.lineTo(bx+w+2, by-h); x.closePath(); x.fill();
+  }
+}
+
+const BATTLE_BGS = {
+  varese(x, W, H, t){
+    bgSky(x, W, H, '#6fb0e8', '#d8ecf8');
+    bgSun(x, W*0.80, H*0.13, H*0.055, '#fff4c8');
+    bgClouds(x, W, H, t, 'rgba(255,255,255,.8)');
+    ridge(x, W, H, 0.34, '#8fa8c4', 0.06);          // Campo dei Fiori
+    ridge(x, W, H, 0.46, '#6f8fae', 0.045);
+    // lago di Varese in lontananza
+    x.fillStyle = 'rgba(165,210,240,.9)';
+    x.beginPath(); x.ellipse(W*0.22, H*0.60, W*0.17, H*0.022, 0, 0, Math.PI*2); x.fill();
+    // campanile lontano
+    bgTower(x, W*0.62, H*0.62, 10, H*0.13, 'rgba(90,100,130,.55)');
+    bgGround(x, W, H, '#5d9c50', '#2c5426');
+  },
+  vedano(x, W, H, t){
+    bgSky(x, W, H, '#79b8d8', '#e0eedd');
+    bgClouds(x, W, H, t, 'rgba(255,255,255,.7)');
+    ridge(x, W, H, 0.38, '#5d8a68', 0.05);
+    ridge(x, W, H, 0.48, '#41694a', 0.04);
+    // la filanda sull'Olona: capannone e ciminiera
+    x.fillStyle = 'rgba(105,80,70,.75)';
+    x.fillRect(W*0.68, H*0.50, W*0.16, H*0.12);
+    x.beginPath(); x.moveTo(W*0.68, H*0.50); x.lineTo(W*0.76, H*0.44); x.lineTo(W*0.84, H*0.50); x.closePath(); x.fill();
+    x.fillRect(W*0.86, H*0.36, W*0.02, H*0.26);
+    bgGround(x, W, H, '#4d8a44', '#26461f');
+    // il fiume attraversa il campo
+    x.fillStyle = 'rgba(70,140,190,.75)';
+    x.beginPath();
+    x.moveTo(0, H*0.70);
+    x.quadraticCurveTo(W*0.4, H*0.66, W, H*0.74);
+    x.lineTo(W, H*0.79);
+    x.quadraticCurveTo(W*0.4, H*0.71, 0, H*0.755);
+    x.closePath(); x.fill();
+    x.strokeStyle = `rgba(200,235,255,${0.35+Math.sin(t*2)*0.15})`; x.lineWidth = 1.6;
+    x.beginPath(); x.moveTo(0, H*0.725); x.quadraticCurveTo(W*0.4, H*0.685, W, H*0.765); x.stroke();
+  },
+  castiglione(x, W, H, t){
+    bgSky(x, W, H, '#e8a05c', '#f8e3b8');                 // ora dorata sul borgo
+    bgSun(x, W*0.30, H*0.20, H*0.06, '#ffe9b0');
+    bgClouds(x, W, H, t, 'rgba(255,240,220,.6)');
+    ridge(x, W, H, 0.40, '#a8785a', 0.05);
+    // il borgo medievale: torri, collegiata, mura
+    bgTower(x, W*0.56, H*0.55, 16, H*0.20, 'rgba(110,70,60,.8)');
+    bgTower(x, W*0.72, H*0.58, 22, H*0.26, 'rgba(95,60,52,.85)', true);
+    bgTower(x, W*0.84, H*0.56, 14, H*0.16, 'rgba(110,70,60,.8)');
+    x.fillStyle = 'rgba(120,80,66,.7)';
+    x.fillRect(W*0.52, H*0.52, W*0.4, H*0.10);
+    bgGround(x, W, H, '#a8894c', '#5c4526');
+  },
+  jerago(x, W, H, t){
+    bgSky(x, W, H, '#d87a50', '#f8d8a0');                 // tramonto sulle colline
+    bgSun(x, W*0.68, H*0.24, H*0.07, '#ffd9a0');
+    ridge(x, W, H, 0.36, '#8a6a78', 0.06);
+    // il castello di Jerago sul colle
+    ridge(x, W, H, 0.50, '#5c4a54', 0.05);
+    bgTower(x, W*0.18, H*0.44, 18, H*0.16, 'rgba(70,55,66,.95)', true);
+    bgTower(x, W*0.26, H*0.44, 14, H*0.12, 'rgba(70,55,66,.95)', true);
+    x.fillStyle = 'rgba(70,55,66,.95)';
+    x.fillRect(W*0.18, H*0.40, W*0.10, H*0.04);
+    bgGround(x, W, H, '#7a8a44', '#3c4a20');
+  },
+  samarate(x, W, H, t){
+    bgSky(x, W, H, '#3c4468', '#c88a68');                 // crepuscolo industriale
+    bgSun(x, W*0.24, H*0.34, H*0.05, '#ffb070');
+    ridge(x, W, H, 0.46, '#4a4458', 0.03);
+    // hangar delle officine aeronautiche + antenna
+    x.fillStyle = 'rgba(52,54,72,.9)';
+    for (const [hx, hw] of [[0.58, 0.14], [0.74, 0.18]]){
+      x.beginPath();
+      x.moveTo(W*hx, H*0.62);
+      x.lineTo(W*hx, H*0.52);
+      x.arc(W*(hx+hw/2), H*0.52, W*hw/2, Math.PI, 0);
+      x.lineTo(W*(hx+hw), H*0.62);
+      x.closePath(); x.fill();
+    }
+    x.strokeStyle = 'rgba(52,54,72,.9)'; x.lineWidth = 3;
+    x.beginPath(); x.moveTo(W*0.52, H*0.62); x.lineTo(W*0.52, H*0.38); x.stroke();
+    x.fillStyle = `rgba(255,80,80,${0.5+Math.sin(t*3)*0.4})`;
+    x.beginPath(); x.arc(W*0.52, H*0.375, 3, 0, Math.PI*2); x.fill();
+    bgGround(x, W, H, '#8a7a4c', '#3c3420');
+  },
+  sacromonte(x, W, H, t){
+    bgSky(x, W, H, '#1a1030', '#4a2050');                 // notte al santuario
+    // stelle
+    for (let i=0; i<24; i++){
+      const sx = (i*97) % W, sy = (i*53) % (H*0.45);
+      x.fillStyle = `rgba(255,255,255,${0.3 + Math.sin(t*2 + i)*0.25})`;
+      x.fillRect(sx, sy, 2, 2);
+    }
+    bgSun(x, W*0.72, H*0.14, H*0.05, '#cdd6ff');          // luna
+    // nube viola della strega
+    x.fillStyle = `rgba(140,60,180,${0.20 + Math.sin(t*0.8)*0.06})`;
+    x.beginPath(); x.ellipse(W*0.5, H*0.16, W*0.32, H*0.08, 0, 0, Math.PI*2); x.fill();
+    ridge(x, W, H, 0.34, '#2c2044', 0.07);
+    // le cappelle in fila sul crinale
+    for (let i=0; i<5; i++){
+      bgTower(x, W*(0.15+i*0.16), H*0.47, 12, H*0.07, 'rgba(200,190,220,.35)');
+    }
+    ridge(x, W, H, 0.50, '#201830', 0.05);
+    bgGround(x, W, H, '#3c3050', '#171024');
+  },
+};
 
 function drawScene(ts, dt){
   if (!B) return;
   const x = sceneCtx, W = B.W, H = B.H;
   const t = ts / 1000;
 
-  // sfondo: cielo + colline + terreno
-  x.fillStyle = (g=>{ g.addColorStop(0, B.boss ? '#2a1030' : '#1a1840'); g.addColorStop(1, B.boss ? '#451b33' : '#34306b'); return g; })(x.createLinearGradient(0, 0, 0, H*0.62));
-  x.fillRect(0, 0, W, H*0.62);
-  x.fillStyle = 'rgba(12,10,34,.8)';
-  x.beginPath();
-  x.moveTo(0, H*0.62);
-  for (let i=0; i<=8; i++){
-    x.lineTo(W*i/8, H*0.62 - (i%2 ? H*0.10 : H*0.04) - Math.sin(i*2.3)*H*0.02);
+  // sfondo a tema con la zona della provincia in cui si combatte
+  (BATTLE_BGS[B.area] || BATTLE_BGS.varese)(x, W, H, t);
+  if (B.boss){
+    // vignettatura minacciosa per i boss
+    const vg = x.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.95);
+    vg.addColorStop(0, 'rgba(40,0,20,0)');
+    vg.addColorStop(1, 'rgba(40,0,25,.55)');
+    x.fillStyle = vg;
+    x.fillRect(0, 0, W, H);
   }
-  x.lineTo(W, H*0.62);
-  x.closePath(); x.fill();
-  // luna
-  x.save(); x.shadowColor = '#cdd6ff'; x.shadowBlur = 18;
-  x.fillStyle = '#cdd6ff';
-  x.beginPath(); x.arc(W*0.62, H*0.14, H*0.05, 0, Math.PI*2); x.fill();
-  x.restore();
-  // terreno
-  x.fillStyle = (g=>{ g.addColorStop(0, B.boss ? '#3c2330' : '#284730'); g.addColorStop(1, B.boss ? '#1f1018' : '#142718'); return g; })(x.createLinearGradient(0, H*0.62, 0, H));
-  x.fillRect(0, H*0.62, W, H*0.38);
-  x.fillStyle = 'rgba(255,255,255,.05)';
-  x.beginPath(); x.ellipse(W*0.5, H*0.78, W*0.42, H*0.16, 0, 0, Math.PI*2); x.fill();
 
   // aggiorna animazioni
   for (const u of [...B.enemies, ...B.allies]){
@@ -150,14 +302,26 @@ function drawScene(ts, dt){
     u.shakeT = Math.max(0, u.shakeT - dt);
     u.flashT = Math.max(0, u.flashT - dt);
     u.castT = Math.max(0, u.castT - dt);
+    u.dashT = Math.max(0, (u.dashT || 0) - dt);
     const dead = u.kind === 'enemy' ? u.hp <= 0 : u.cs.hp <= 0;
     if (u.kind === 'enemy'){
       u.deadT = dead ? Math.min(1, u.deadT + dt * 1.6) : 0;
     }
-    const lp = u.lungeT > 0 ? Math.sin((1 - u.lungeT/0.42) * Math.PI) : 0;
-    u.ox = u.lungeDir * lp * Math.min(60, B.W*0.07)
-         + (u.shakeT > 0 ? (Math.random()*2-1) * u.shakeT * 22 : 0);
-    u.oy = 0;
+    if (u.dashT > 0 && u.dashGoal){
+      // corsa verso il bersaglio: accelerazione, colpo, ritorno
+      const p = 1 - u.dashT / u.dashDur;
+      let k;
+      if (p < 0.38) k = 1 - Math.pow(1 - p/0.38, 2);
+      else if (p < 0.58) k = 1;
+      else k = 1 - Math.pow((p - 0.58)/0.42, 1.6);
+      u.ox = u.dashGoal.x * k + (u.shakeT > 0 ? (Math.random()*2-1) * u.shakeT * 22 : 0);
+      u.oy = u.dashGoal.y * k - Math.sin(Math.min(1, p/0.38) * Math.PI) * 14;
+    } else {
+      const lp = u.lungeT > 0 ? Math.sin((1 - u.lungeT/0.42) * Math.PI) : 0;
+      u.ox = u.lungeDir * lp * Math.min(60, B.W*0.07)
+           + (u.shakeT > 0 ? (Math.random()*2-1) * u.shakeT * 22 : 0);
+      u.oy = 0;
+    }
   }
 
   // selezione bersaglio attiva?
@@ -174,6 +338,106 @@ function drawScene(ts, dt){
   for (const u of units){
     if (u.castT > 0) drawCast(x, u, t);
   }
+
+  // effetti speciali (proiettili magici, fulmini, fendenti, cure)
+  updateFx(x, dt, t);
+}
+
+// ---------- effetti speciali delle mosse ----------
+const ELEM_FX = {
+  fuoco:'#ff8a3c', ghiaccio:'#9fdcff', tuono:'#ffe95a', acqua:'#57b0f0',
+  vento:'#a8f0c0', terra:'#d0a05a', sacro:'#fff2b0', oscurita:'#b06ae8', neutro:'#cfd8ff',
+};
+
+function spawnFx(fx){ B?.fx?.push({ t:0, ...fx }); }
+
+function fxForSpell(user, target, element){
+  const color = ELEM_FX[element] || ELEM_FX.neutro;
+  const ty = target.sy - target.size*0.5;
+  if (element === 'tuono'){
+    spawnFx({ kind:'bolt', x1:target.sx, y1:ty + target.size*0.1, dur:0.30, color });
+  } else {
+    spawnFx({ kind:'proj', x0:user.sx + user.ox, y0:user.sy - user.size*0.55,
+              x1:target.sx, y1:ty, dur:0.34, color });
+  }
+  spawnFx({ kind:'burst', x1:target.sx, y1:ty, dur:0.5, delay:0.32, color });
+}
+
+function updateFx(x, dt, t){
+  if (!B.fx) return;
+  for (const f of B.fx) f.t += dt;
+  B.fx = B.fx.filter(f=>f.t < (f.delay||0) + f.dur);
+  x.save();
+  x.globalCompositeOperation = 'lighter';
+  for (const f of B.fx){
+    const lt = f.t - (f.delay||0);
+    if (lt < 0) continue;
+    const p = Math.min(1, lt / f.dur);
+    if (f.kind === 'proj'){
+      const px = f.x0 + (f.x1-f.x0)*p;
+      const py = f.y0 + (f.y1-f.y0)*p - Math.sin(p*Math.PI)*46;
+      x.shadowColor = f.color; x.shadowBlur = 14;
+      x.fillStyle = f.color;
+      x.beginPath(); x.arc(px, py, 6, 0, Math.PI*2); x.fill();
+      // scia
+      for (let i=1; i<=4; i++){
+        const q = Math.max(0, p - i*0.05);
+        const qx = f.x0 + (f.x1-f.x0)*q;
+        const qy = f.y0 + (f.y1-f.y0)*q - Math.sin(q*Math.PI)*46;
+        x.globalAlpha = 0.5 - i*0.11;
+        x.beginPath(); x.arc(qx, qy, 5 - i, 0, Math.PI*2); x.fill();
+      }
+      x.globalAlpha = 1;
+    } else if (f.kind === 'bolt'){
+      x.strokeStyle = f.color; x.lineWidth = 3.5;
+      x.shadowColor = f.color; x.shadowBlur = 16;
+      x.globalAlpha = p < 0.15 ? p/0.15 : 1 - (p-0.15)/0.85;
+      x.beginPath();
+      let by = -10, bx = f.x1 + 30;
+      x.moveTo(bx, by);
+      while (by < f.y1){
+        by += 22 + Math.random()*14;
+        bx = f.x1 + (Math.random()*2-1) * 22 * Math.max(0.1, (f.y1-by)/f.y1);
+        x.lineTo(bx, Math.min(by, f.y1));
+      }
+      x.stroke();
+      x.globalAlpha = 1;
+    } else if (f.kind === 'burst'){
+      for (let i=0; i<10; i++){
+        const a = i/10 * Math.PI*2 + (f.x1%7);
+        const r = p * 34;
+        x.globalAlpha = (1-p) * 0.9;
+        x.fillStyle = f.color;
+        x.beginPath();
+        x.arc(f.x1 + Math.cos(a)*r, f.y1 + Math.sin(a)*r*0.7 - p*10, 3.4*(1-p)+0.8, 0, Math.PI*2);
+        x.fill();
+      }
+      x.globalAlpha = 1;
+    } else if (f.kind === 'slash'){
+      // fendente ad arco
+      x.strokeStyle = '#fff';
+      x.shadowColor = f.color || '#fff'; x.shadowBlur = 12;
+      x.lineWidth = 4 * (1-p) + 1;
+      x.globalAlpha = 1 - p;
+      const a0 = -Math.PI*0.85 + p*1.2, a1 = a0 + Math.PI*0.75;
+      x.beginPath(); x.arc(f.x1, f.y1, 30 + p*14, a0, a1); x.stroke();
+      x.globalAlpha = 1;
+    } else if (f.kind === 'heal'){
+      for (let i=0; i<7; i++){
+        const q = (p + i/7) % 1;
+        const hx = f.x1 + Math.sin(i*2.7 + p*6) * 18;
+        const hy = f.y1 + 20 - q*54;
+        x.globalAlpha = (1-q) * 0.8;
+        x.fillStyle = f.color || '#a0ffb8';
+        x.beginPath(); x.arc(hx, hy, 2.6, 0, Math.PI*2); x.fill();
+        // crocetta di luce
+        x.fillRect(hx-4, hy-0.8, 8, 1.6);
+        x.fillRect(hx-0.8, hy-4, 1.6, 8);
+      }
+      x.globalAlpha = 1;
+    }
+  }
+  x.restore();
 }
 
 function drawTargetRing(x, u, t){
@@ -197,7 +461,7 @@ function drawEnemyUnit(x, e, t, selected){
   if (selected) drawTargetRing(x, e, t);
   x.save();
   x.globalAlpha = 1 - e.deadT;
-  const dy = e.deadT * 24;
+  const dy = e.deadT * 24 + (e.oy || 0);
   x.drawImage(e.sprite, e.sx + e.ox - e.size/2, e.sy + bob + dy - e.size*0.92, e.size, e.size);
   if (e.flashT > 0){
     x.globalCompositeOperation = 'lighter';
@@ -237,10 +501,12 @@ function drawAllyUnit(x, a, t, selected){
     x.beginPath(); x.ellipse(a.sx + a.ox, a.sy + 3, a.size*0.34, a.size*0.12, 0, 0, Math.PI*2); x.fill();
     x.restore();
   }
-  const breathe = ko ? 0 : Math.sin(t*2.2 + a.sy) * 1.6;
+  const breathe = ko ? 0
+    : B.victory ? -Math.abs(Math.sin(t*5 + a.sy)) * 8       // saltello di vittoria
+    : Math.sin(t*2.2 + a.sy) * 1.6;
   const s = a.size / 64; // drawActor è alto ~64px in scala TILE
   x.save();
-  x.translate(a.sx + a.ox, a.sy + breathe);
+  x.translate(a.sx + a.ox, a.sy + breathe + (a.oy || 0));
   if (a.flashT > 0) x.globalAlpha = 0.5 + Math.sin(t*60)*0.5;
   if (ko){
     x.globalAlpha = 0.45;
@@ -248,7 +514,7 @@ function drawAllyUnit(x, a, t, selected){
     x.translate(0, 6);
   }
   x.scale(s, s);
-  drawActor(x, -TILE/2, -46, a.def, 'left', ko ? 0 : (a.lungeT > 0 ? (t*3)%1 : 0));
+  drawActor(x, -TILE/2, -46, a.def, 'left', ko ? 0 : (a.lungeT > 0 || a.dashT > 0 ? (t*3)%1 : 0));
   x.restore();
   // indicatore del turno attivo
   if (active && !ko){
@@ -310,7 +576,7 @@ function computeDamage(user, target, move){
     dmg = (uMag * buffMult(user,'atk') * 2.2 + (move.power||0) * 1.8) * v * em - tSpr * 1.2;
   }
   // bilanciamento a favore del party: gli eroi colpiscono più forte, i mostri meno
-  dmg *= user.kind === 'ally' ? 1.25 : 0.7;
+  dmg *= user.kind === 'ally' ? 1.45 : 0.55;
   return { dmg: Math.max(1, Math.round(dmg)), crit, em };
 }
 
@@ -522,7 +788,7 @@ function tryFlee(a){
   hideCommands();
   a.atb = 0;
   B.readyQueue.shift();
-  if (Math.random() < 0.85){
+  if (Math.random() < 0.92){
     log('Siete fuggiti!');
     endBattle('flee');
   } else {
@@ -639,7 +905,21 @@ function execAbility(user, abId, targets, done){
   const userName = user.name;
   if (ab.limit){ sfx('limit'); flash('rgba(255,120,160,.5)'); }
   log(abId === 'attacco' ? `${userName} attacca!` : `${userName} usa ${ab.name}!`);
-  animate(user, (ab.type === 'phys' || ab.type === 'steal') ? 'lunge' : 'cast');
+  const singleFoe = targets.length === 1 && targets[0] !== user;
+  if (ab.type === 'phys' || ab.type === 'steal'){
+    if (singleFoe) animate(user, 'dash', targets[0]);
+    else animate(user, 'lunge');
+  } else {
+    animate(user, 'cast');
+  }
+  if (ab.type === 'mag'){
+    for (const t of targets) fxForSpell(user, t, ab.element);
+  } else if (['heal','healall','revive','buff'].includes(ab.type)){
+    for (const t of targets){
+      spawnFx({ kind:'heal', x1:t.sx, y1:t.sy - t.size*0.5, dur:0.8,
+                color: ab.type === 'buff' ? '#ffd76a' : '#a0ffb8' });
+    }
+  }
 
   setTimeout(()=>{
     const hits = ab.hits || 1;
@@ -655,6 +935,10 @@ function execAbility(user, abId, targets, done){
         }
         applyDamage(t, total);
         animate(t, 'hit');
+        if (ab.type !== 'mag'){
+          spawnFx({ kind:'slash', x1:t.sx, y1:t.sy - t.size*0.5, dur:0.30,
+                    color: ELEM_FX[ab.element] || '#fff' });
+        }
         popDamage(t, total, anyCrit ? 'crit' : '');
         if (ab.status && Math.random() < ab.status.chance){
           t.statuses[ab.status.id] = true;
@@ -756,7 +1040,12 @@ function enemyAct(e, done){
   const targets = move.target === 'enemies' ? aliveAllies()
     : [aliveAllies()[Math.floor(Math.random()*aliveAllies().length)]];
   log(`${e.name}: ${move.name}!`);
-  animate(e, move.type === 'phys' ? 'lunge' : 'cast');
+  const singleFoe = targets.length === 1;
+  if (move.type === 'phys' && singleFoe) animate(e, 'dash', targets[0]);
+  else animate(e, move.type === 'phys' ? 'lunge' : 'cast');
+  if (move.type === 'mag'){
+    for (const t of targets) fxForSpell(e, t, move.element);
+  }
   setTimeout(()=>{
     if (move.type === 'status'){
       for (const t of targets){
@@ -772,6 +1061,10 @@ function enemyAct(e, done){
         const { dmg, crit } = computeDamage(e, t, move);
         applyDamage(t, dmg);
         animate(t, 'hit');
+        if (move.type === 'phys'){
+          spawnFx({ kind:'slash', x1:t.sx, y1:t.sy - t.size*0.5, dur:0.30,
+                    color: ELEM_FX[move.element] || '#fff' });
+        }
         if (move.status && Math.random() < move.status.chance) t.statuses[move.status.id] = true;
         popDamage(t, dmg, crit ? 'crit' : '');
       }
@@ -820,7 +1113,7 @@ function tick(){
     if (B.animLock) continue;
     if (choosing && u.kind === 'enemy') { /* i nemici caricano comunque */ }
     const spd = u.kind==='ally' ? u.st.spd : u.spd;
-    u.atb += (4 + spd * 0.35) * (TICK_MS/100) * (u.kind==='ally' ? 1.15 : 1);
+    u.atb += (4 + spd * 0.35) * (TICK_MS/100) * (u.kind==='ally' ? 1.3 : 1);
     if (u.atb >= ATB_MAX){
       u.atb = ATB_MAX;
       if (!B.readyQueue.includes(u)) B.readyQueue.push(u);
@@ -837,12 +1130,22 @@ function tick(){
 function victory(){
   if (B.over) return;
   B.over = true;
+  B.victory = true;   // gli eroi festeggiano saltellando
   B.targetMode = null;
+  stopMusic();
+  sfx('victory');
   hideCommands();
   let exp = 0, gold = 0;
   for (const e of B.enemies){ exp += e.def.exp; gold += e.def.gold; }
   G.s.gold += gold;
   const lines = [`VITTORIA! ${exp} EXP, ${gold} oro.`];
+  // avanzamento delle missioni secondarie di caccia
+  for (const e of B.enemies){
+    for (const prog of registerKill(G.s, e.id)){
+      lines.push(`📜 ${prog.name}: ${prog.count}/${prog.need}`);
+      if (prog.count >= prog.need) lines.push(`📜 «${prog.name}»: obiettivo raggiunto! Torna dal committente.`);
+    }
+  }
   for (const id of G.s.party){
     const cs = G.s.chars[id];
     if (cs.hp <= 0) continue;
@@ -904,9 +1207,12 @@ registerScreen('battle', {
       enemies: params.monsterIds.map((id,i)=>makeEnemy(id,i)),
       allies: G.s.party.map(makeAlly),
       boss: !!params.boss,
+      area: params.area || 'varese',
       onWin: params.onWin,
       onFlee: params.onFlee,
       readyQueue: [],
+      fx: [],
+      victory: false,
       animLock: false,
       targetMode: null,
       targetIdx: 0,
@@ -914,6 +1220,11 @@ registerScreen('battle', {
       over: false,
       W: 800, H: 360,
     };
+    // transizione a vortice in stile FF
+    const swirl = document.createElement('div');
+    swirl.className = 'battle-swirl';
+    el.appendChild(swirl);
+    setTimeout(()=>swirl.remove(), 1000);
     hideCommands();
     popsEl.innerHTML = '';
     logEl.textContent = B.boss ? '⚠ Nemico potente!' : 'Nemici in arrivo!';

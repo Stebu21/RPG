@@ -6,6 +6,7 @@
 <title>Cronache di Varese</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css">
+<script type="importmap">{ "imports": { "three": "./js/vendor/three/three.module.js", "three/addons/": "./js/vendor/three/addons/" } }</script>
 </head>
 <body>
 <div id="game">
@@ -40,7 +41,8 @@
 
   <!-- MONDO -->
   <div id="screen-world" class="screen hidden">
-    <canvas id="world-canvas" width="960" height="576"></canvas>
+    <!-- mondo 3D renderizzato con three.js (engine/world3d.js) -->
+    <canvas id="world-canvas"></canvas>
     <div id="world-vignette"></div>
     <div id="world-hud">
       <span id="hud-location"></span>

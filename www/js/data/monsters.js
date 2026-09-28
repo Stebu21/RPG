@@ -189,10 +189,10 @@ export const MONSTERS = {
 
 // Zone di incontri casuali: liste pesate + dimensione gruppo
 export const ZONES = {
-  varese:      { monsters:['lumacone','corvo','ratto'], min:1, max:2, rate:0.10 },
-  vedano:      { monsters:['lupo','fungo','bandito'], min:1, max:2, rate:0.11 },
-  castiglione: { monsters:['spettro','gargoyle','serpe'], min:1, max:3, rate:0.11 },
-  jerago:      { monsters:['cavaliere','arpia','cinghiale'], min:1, max:3, rate:0.11 },
-  samarate:    { monsters:['automa','falco_acciaio','vespa'], min:1, max:3, rate:0.12 },
-  sacromonte:  { monsters:['guardiano','anima','chimera'], min:1, max:3, rate:0.14 },
+  varese:      { monsters:['lumacone','corvo','ratto'], min:1, max:2, rate:0.07 },
+  vedano:      { monsters:['lupo','fungo','bandito'], min:1, max:2, rate:0.08 },
+  castiglione: { monsters:['spettro','gargoyle','serpe'], min:1, max:2, rate:0.08 },
+  jerago:      { monsters:['cavaliere','arpia','cinghiale'], min:1, max:3, rate:0.08 },
+  samarate:    { monsters:['automa','falco_acciaio','vespa'], min:1, max:3, rate:0.09 },
+  sacromonte:  { monsters:['guardiano','anima','chimera'], min:1, max:3, rate:0.10 },
 };

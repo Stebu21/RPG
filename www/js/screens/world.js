@@ -2,18 +2,21 @@
 
 import { MAPS, SIGILLI } from '../data/maps.js';
 import { NPCS, EVENTS } from '../data/story.js';
+import { QUESTS, questState, questAccept, questReadyToComplete } from '../data/quests.js';
 import { ZONES, MONSTERS } from '../data/monsters.js';
 import { ITEMS, SHOPS, INN_PRICES } from '../data/items.js';
 import { CHARACTERS } from '../data/characters.js';
 import { G, fullHeal, addCharacter, addItem } from '../engine/state.js';
-import { TILE, drawGround, drawObject, TALL, drawActor, drawChest, BLOCKED } from '../engine/sprites.js';
+import { drawActor, BLOCKED } from '../engine/sprites.js';
+import { World3D } from '../engine/world3d.js';
 import { Input } from '../engine/input.js';
 import { playMusic, sfx } from '../engine/audio.js';
 import { registerScreen, show, currentScreen } from '../engine/ui.js';
 
 const el = document.getElementById('screen-world');
 const canvas = document.getElementById('world-canvas');
-const ctx = canvas.getContext('2d');
+let W3 = null;   // motore 3D, creato al primo ingresso nel mondo
+let builtMap = null;
 const hudLoc = document.getElementById('hud-location');
 const dlgBox = document.getElementById('dialog-box');
 const dlgName = document.getElementById('dialog-name');
@@ -22,10 +25,16 @@ const choiceBox = document.getElementById('choice-box');
 
 let raf = 0;
 let map = null;
-let player = { x:0, y:0, dir:'down', moving:false, prog:0, fromX:0, fromY:0 };
+let player = newPlayer(0, 0);
 let dialogQueue = null;   // { lines, idx, onDone }
 let busy = false;         // dialogo/scelta/evento in corso
 let stepFrame = 0;
+
+// Il giocatore si muove in modo continuo: (px, pz) è la posizione in caselle
+// (centro casella = x+0.5), (x, y) è la casella occupata usata da trigger e salvataggi.
+function newPlayer(x, y){
+  return { x, y, px:x+0.5, pz:y+0.5, vx:0, vz:0, dir:'down', walk:0, lean:0, bump:0, hop:0, hopV:0 };
+}
 
 // ---------- util ----------
 function condOk(c){
@@ -57,7 +66,7 @@ function walkable(x, y){
   const ch = tileAt(x, y);
   if (BLOCKED.has(ch)) return false;
   const t = triggerAt(x, y);
-  if (t && t.type === 'npc') return false;
+  if (t && (t.type === 'npc' || t.type === 'quest')) return false;
   return true;
 }
 
@@ -167,7 +176,7 @@ function runSteps(steps, i=0){
   if (st.heal){ fullHeal(); sfx('heal'); next(); return; }
   if (st.battle){
     show('battle', {
-      monsterIds:[st.battle], boss:true,
+      monsterIds:[st.battle], boss:true, area: G.s.map,
       onWin: ()=>{ show('world', { resume:true }); runSteps(steps, i+1); },
     });
     return;
@@ -199,7 +208,8 @@ function fireStepTrigger(t){
     case 'portal':
       if (t.needSigilli && sigilliCount() < t.needSigilli){
         // respingi il giocatore di una casella e mostra il messaggio
-        G.s.x = player.x; G.s.y = player.y + 1; player.y = player.y + 1;
+        G.s.x = player.x; G.s.y = player.y + 1;
+        player = { ...newPlayer(player.x, player.y + 1), dir:'down' };
         showDialog([['', t.lockedMsg||'È chiuso.']]);
         return;
       }
@@ -224,8 +234,47 @@ function fireStepTrigger(t){
   }
 }
 
+// dialogo delle missioni secondarie: offerta -> in corso -> consegna -> dopo
+function runQuestNpc(t){
+  const q = QUESTS[t.quest];
+  if (!q){ showDialog([['???','...']]); return; }
+  const st = questState(G.s, t.quest);
+  if (!st){
+    showDialog(q.offer, ()=>{
+      showChoice([
+        { label:`Accetto! <small>${q.name}</small>`, cb:()=>{
+            questAccept(G.s, t.quest);
+            sfx('confirm');
+            showDialog(q.accepted);
+          } },
+        { label:'Magari più tardi', cb:()=>{} },
+      ]);
+    });
+    return;
+  }
+  if (st.done){ showDialog(q.after); return; }
+  if (questReadyToComplete(G.s, t.quest)){
+    // consegna: per le missioni di raccolta si consegnano gli oggetti
+    if (q.kind === 'item'){
+      G.s.items[q.item] -= q.need;
+      if (G.s.items[q.item] <= 0) delete G.s.items[q.item];
+    }
+    st.done = true;
+    if (q.reward.gold) G.s.gold += q.reward.gold;
+    if (q.reward.item) addItem(q.reward.item, q.reward.qty || 1);
+    sfx('levelup');
+    const rewards = [];
+    if (q.reward.gold) rewards.push(`${q.reward.gold} oro`);
+    if (q.reward.item) rewards.push(`${ITEMS[q.reward.item].name} x${q.reward.qty||1}`);
+    showDialog([...q.complete, ['', `Missione «${q.name}» completata! Ricompensa: ${rewards.join(', ')}.`]]);
+    return;
+  }
+  showDialog(q.progress);
+}
+
 function fireActionTrigger(t){
   switch(t.type){
+    case 'quest': runQuestNpc(t); return;
     case 'npc': {
       const variants = NPCS[t.npc] || [{ name:'???', lines:['...'] }];
       const v = variants.find(x=>condOk(x.if)) || variants[variants.length-1];
@@ -295,7 +344,7 @@ export function loadMap(name, x, y){
   map = MAPS[name];
   G.s.map = name;
   G.s.x = x; G.s.y = y;
-  player = { x, y, dir:'down', moving:false, prog:0, fromX:x, fromY:y };
+  player = newPlayer(x, y);
   hudLoc.textContent = map.name;
   playMusic(map.music || 'world');
   checkEnterEvents();
@@ -314,46 +363,145 @@ function tryEncounter(){
     const ids = [];
     for (let i=0; i<n; i++) ids.push(zone.monsters[Math.floor(Math.random()*zone.monsters.length)]);
     show('battle', {
-      monsterIds: ids, boss:false,
+      monsterIds: ids, boss:false, area: zname,
       onWin: ()=>show('world', { resume:true }),
       onFlee: ()=>show('world', { resume:true }),
     });
   }
 }
 
-// ---------- movimento ----------
-const MOVE_TIME = 0.16; // secondi per casella
+// ---------- fisica del movimento ----------
+// Velocità in caselle/secondo. A piedi si accelera e si frena in fretta;
+// in bici si prende velocità lentamente e si va per inerzia (attrito basso),
+// si piega in curva e si rimbalza contro gli ostacoli.
+const PHYS = {
+  walk: { max:3.4, accel:28, fric:16 },
+  run:  { max:5.6, accel:30, fric:14 },
+  bike: { max:9.0, accel:9,  fric:1.8, turn:5 },
+};
+const RADIUS = 0.3;       // raggio di collisione del giocatore (caselle)
+let running = false;
 let lastTs = 0;
 
+window.addEventListener('keydown', e=>{ if (e.key === 'Shift') running = true; });
+window.addEventListener('keyup',   e=>{ if (e.key === 'Shift') running = false; });
+
+const onBike = ()=>G.s.flags.bici_on && (G.s.items.bici > 0) && !map.indoor;
+
+// il cerchio (cx, cz, r) tocca una casella bloccata?
+function collides(cx, cz, r){
+  const x0 = Math.floor(cx - r), x1 = Math.floor(cx + r);
+  const z0 = Math.floor(cz - r), z1 = Math.floor(cz + r);
+  for (let ty = z0; ty <= z1; ty++) for (let tx = x0; tx <= x1; tx++){
+    if (tx === player.x && ty === player.y) continue; // mai incastrati nella propria casella
+    if (walkable(tx, ty)) continue;
+    // distanza cerchio-rettangolo
+    const nx = Math.max(tx, Math.min(cx, tx + 1)), nz = Math.max(ty, Math.min(cz, ty + 1));
+    const dx = cx - nx, dz = cz - nz;
+    if (dx*dx + dz*dz < r*r) return true;
+  }
+  return false;
+}
+
+// muove lungo un asse; se urta prova a "scivolare" verso il centro della
+// corsia libera (così si imboccano porte e ponti senza allinearsi al pixel)
+function moveAxis(axis, d){
+  if (!d) return true;
+  const nx = player.px + (axis === 'x' ? d : 0), nz = player.pz + (axis === 'z' ? d : 0);
+  if (!collides(nx, nz, RADIUS)){ player.px = nx; player.pz = nz; return true; }
+  const other = axis === 'x' ? 'pz' : 'px';
+  const center = Math.floor(player[other]) + 0.5;
+  const off = center - player[other];
+  if (Math.abs(off) > 0.02 && Math.abs(off) < 0.45){
+    const step = Math.sign(off) * Math.min(Math.abs(off), Math.abs(d));
+    const tx = axis === 'x' ? player.px : player.px + step, tz = axis === 'x' ? player.pz + step : player.pz;
+    if (!collides(tx, tz, RADIUS)){ player.px = tx; player.pz = tz; }
+  }
+  return false;
+}
+
 function update(dt){
-  if (busy) return;
-  if (player.moving){
-    player.prog += dt / MOVE_TIME;
-    if (player.prog >= 1){
-      player.moving = false; player.prog = 0;
-      stepFrame++;
-      G.s.x = player.x; G.s.y = player.y;
-      G.s.steps++;
-      const t = triggerAt(player.x, player.y);
-      if (t && ['portal','door_event','event','shop','inn','heal'].includes(t.type)){
-        fireStepTrigger(t);
-        return;
-      }
-      tryEncounter();
+  // salto/sobbalzo (anche durante i dialoghi, per chiudere l'animazione)
+  if (player.hop > 0 || player.hopV > 0){
+    player.hopV -= 22 * dt; player.hop += player.hopV * dt;
+    if (player.hop <= 0){ player.hop = 0; player.hopV = 0; }
+  }
+  if (busy){ player.vx = player.vz = 0; return; }
+  const bike = onBike();
+  const P = bike ? PHYS.bike : (running && G.s.items.scarpe > 0) ? PHYS.run : PHYS.walk;
+  const ax = Input.axis();
+  let ix = ax.x, iz = ax.y;
+  const len = Math.hypot(ix, iz);
+  if (len){ ix /= len; iz /= len; }
+
+  if (len){
+    // accelera verso la direzione voluta; in bici la traiettoria curva gradualmente
+    const tvx = ix * P.max, tvz = iz * P.max;
+    const a = P.accel * dt;
+    if (bike){
+      const sp = Math.hypot(player.vx, player.vz);
+      const k = Math.min(1, P.turn * dt);
+      let dvx = player.vx + (ix * Math.max(sp, 1) - player.vx) * k;
+      let dvz = player.vz + (iz * Math.max(sp, 1) - player.vz) * k;
+      const s2 = Math.min(P.max, Math.hypot(dvx, dvz) + a);
+      const l2 = Math.hypot(dvx, dvz) || 1;
+      // piega: prodotto vettoriale tra velocità e sterzata
+      const cross = (player.vx * iz - player.vz * ix) / (sp || 1);
+      player.lean += (-cross * 0.35 - player.lean) * Math.min(1, dt * 6);
+      player.vx = dvx / l2 * s2; player.vz = dvz / l2 * s2;
+    } else {
+      const dvx = tvx - player.vx, dvz = tvz - player.vz;
+      const dl = Math.hypot(dvx, dvz);
+      const f = dl > a ? a / dl : 1;
+      player.vx += dvx * f; player.vz += dvz * f;
     }
-    return;
+    // la direzione del volto segue l'asse dominante dell'input
+    player.dir = Math.abs(ix) > Math.abs(iz) ? (ix < 0 ? 'left' : 'right') : (iz < 0 ? 'up' : 'down');
+  } else {
+    const sp = Math.hypot(player.vx, player.vz);
+    const ns = Math.max(0, sp - P.fric * dt * (bike ? 1 : 1 + sp * 0.3));
+    if (sp > 0){ player.vx *= ns / sp; player.vz *= ns / sp; }
+    player.lean *= Math.max(0, 1 - dt * 5);
   }
-  const dir = Input.heldDir();
-  if (!dir) return;
-  player.dir = dir;
-  const dx = dir==='left'?-1:dir==='right'?1:0;
-  const dy = dir==='up'?-1:dir==='down'?1:0;
-  const nx = player.x + dx, ny = player.y + dy;
-  if (walkable(nx, ny)){
-    player.fromX = player.x; player.fromY = player.y;
-    player.x = nx; player.y = ny;
-    player.moving = true; player.prog = 0;
+
+  // integrazione con collisioni separate per asse (scivolamento sui muri)
+  const sp = Math.hypot(player.vx, player.vz);
+  const steps = Math.max(1, Math.ceil(sp * dt / 0.1));  // sottopassi: niente tunneling in bici
+  for (let i = 0; i < steps; i++){
+    const okX = moveAxis('x', player.vx * dt / steps);
+    const okZ = moveAxis('z', player.vz * dt / steps);
+    if (!okX){
+      if (bike && Math.abs(player.vx) > 3){ player.vx *= -0.35; bumped(); } else player.vx = 0;
+    }
+    if (!okZ){
+      if (bike && Math.abs(player.vz) > 3){ player.vz *= -0.35; bumped(); } else player.vz = 0;
+    }
   }
+  player.walk += sp * dt * (bike ? 0.9 : 1.6);
+
+  // cambio di casella: salvataggio, trigger a passo, incontri
+  const tx = Math.floor(player.px), ty = Math.floor(player.pz);
+  if (tx !== player.x || ty !== player.y){
+    player.x = tx; player.y = ty;
+    stepFrame++;
+    G.s.x = tx; G.s.y = ty;
+    G.s.steps++;
+    const t = triggerAt(tx, ty);
+    if (t && ['portal','door_event','event','shop','inn','heal'].includes(t.type)){
+      player.vx = player.vz = 0;
+      fireStepTrigger(t);
+      return;
+    }
+    tryEncounter();
+  }
+}
+
+function bumped(){
+  if (player.bump > 0) return;
+  player.bump = 0.25;
+  player.hopV = 3.2;
+  if (W3) W3.shake = 0.6;
+  sfx('cancel');
 }
 
 function onAction(){
@@ -361,102 +509,97 @@ function onAction(){
   if (busy) return;
   const dx = player.dir==='left'?-1:player.dir==='right'?1:0;
   const dy = player.dir==='up'?-1:player.dir==='down'?1:0;
-  const t = triggerAt(player.x+dx, player.y+dy);
-  if (t) fireActionTrigger(t);
+  // la casella davanti a sé, oppure quella che si sta per toccare
+  const t = triggerAt(player.x+dx, player.y+dy)
+         || triggerAt(Math.floor(player.px + dx*0.8), Math.floor(player.pz + dy*0.8));
+  if (t){ fireActionTrigger(t); return; }
+  // salto sul posto (a piedi): puro divertimento, ma fa scena
+  if (!onBike() && player.hop === 0) player.hopV = 5;
 }
 
-// ---------- rendering ----------
-function render(ts){
-  const W = canvas.width, H = canvas.height;
-  // posizione pixel del giocatore (interpolata)
-  const ix = (player.fromX + (player.x - player.fromX) * (player.moving ? player.prog : 1)) * TILE;
-  const iy = (player.fromY + (player.y - player.fromY) * (player.moving ? player.prog : 1)) * TILE;
-  let camX = Math.round(ix - W/2 + TILE/2);
-  let camY = Math.round(iy - H/2 + TILE/2);
-  const mw = Math.max(...map.tiles.map(r=>r.length)) * TILE;
-  const mh = map.tiles.length * TILE;
-  // mappe più piccole della vista: centrale; altrimenti clamp ai bordi
-  camX = mw <= W ? -((W - mw) >> 1) : Math.max(0, Math.min(camX, mw - W));
-  camY = mh <= H ? -((H - mh) >> 1) : Math.max(0, Math.min(camY, mh - H));
-
-  ctx.fillStyle = '#0a0c16';
-  ctx.fillRect(0, 0, W, H);
-  const getCh = (tx, ty)=>tileAt(tx, ty);
-  const x0 = Math.floor(camX / TILE), y0 = Math.floor(camY / TILE);
-  const cols = Math.ceil(W/TILE), rows = Math.ceil(H/TILE);
-
-  // passata 1: terreno (con transizioni e ombre proiettate)
-  for (let ty = y0; ty <= y0 + rows; ty++){
-    for (let tx = x0; tx <= x0 + cols; tx++){
-      drawGround(ctx, tileAt(tx, ty), tx*TILE - camX, ty*TILE - camY, ts, tx, ty, getCh);
-    }
+// ---------- rendering (three.js) ----------
+function render(dt){
+  if (builtMap !== map){
+    W3.build(map, G.s.map, map.triggers);
+    builtMap = map;
+    W3.render(0, { x:player.px, z:player.pz }, { snap:true });
   }
+  player.bump = Math.max(0, player.bump - dt);
+  W3.beginActors();
 
-  // passata 2: oggetti alti + personaggi, ordinati per profondità (y)
-  const items = [];
-  for (let ty = y0; ty <= y0 + rows + 1; ty++){
-    for (let tx = x0; tx <= x0 + cols; tx++){
-      const ch = tileAt(tx, ty);
-      if (!TALL.has(ch)) continue;
-      const px = tx*TILE - camX, py = ty*TILE - camY;
-      // gli oggetti calpestabili (portali, borghi) stanno dietro al giocatore
-      const walkable = !BLOCKED.has(ch);
-      items.push({ y: ty*TILE + (walkable ? 44 : 47), f: ()=>drawObject(ctx, ch, px, py, ts, tx, ty, getCh) });
-    }
-  }
+  // NPC e personaggi delle missioni: respirano e guardano verso il giocatore se vicino
   for (const t of activeTriggers()){
-    const px = t.x*TILE - camX, py = t.y*TILE - camY;
-    if (px < -TILE || px > W || py < -TILE*1.5 || py > H) continue;
-    if (t.type === 'npc') items.push({ y: t.y*TILE + 46, f: ()=>drawActor(ctx, px, py, t.sprite || '#b08968', 'down', 0) });
-    else if (t.type === 'chest') items.push({ y: t.y*TILE + 45, f: ()=>drawChest(ctx, px, py, !!G.s.chests[t.id]) });
+    if (t.type === 'chest'){ W3.chest(t.id, t.x, t.y, !!G.s.chests[t.id]); continue; }
+    if (t.type !== 'npc' && t.type !== 'quest') continue;
+    const a = W3.actor('t:' + t.x + ',' + t.y);
+    const ddx = player.px - (t.x + 0.5), ddz = player.pz - (t.y + 0.5);
+    const near = ddx*ddx + ddz*ddz < 6;
+    const face = !near ? 'down' : Math.abs(ddx) > Math.abs(ddz) ? (ddx < 0 ? 'left' : 'right') : (ddz < 0 ? 'up' : 'down');
+    let mark = '';
+    if (t.type === 'quest'){
+      const st = questState(G.s, t.quest);
+      mark = !st ? '!' : st.done ? '' : (questReadyToComplete(G.s, t.quest) ? '✓' : '…');
+    }
+    const bob = Math.round(Math.sin(W3.clock * 3 + t.x) * 2);
+    a.paint(face + mark + bob, c=>{
+      drawActor(c, 0, 16, t.sprite || '#b08968', face, 0);
+      if (mark){
+        c.font = 'bold 15px system-ui, sans-serif'; c.textAlign = 'center';
+        c.lineWidth = 3; c.strokeStyle = 'rgba(0,0,0,.6)';
+        c.fillStyle = mark === '✓' ? '#7ee787' : '#ffd76a';
+        c.strokeText(mark, 24, 13 + bob); c.fillText(mark, 24, 13 + bob);
+      }
+    });
+    a.place(t.x + 0.5, t.y + 0.5);
   }
+
+  // giocatore
   const leader = CHARACTERS[G.s.party[0]] || CHARACTERS.ste;
-  const pSX = Math.round(ix) - camX, pSY = Math.round(iy) - camY;
-  items.push({ y: iy + 46.5, f: ()=>drawActor(ctx, pSX, pSY, leader, player.dir,
-            player.moving ? (stepFrame + player.prog) * 0.5 : 0) });
-  items.sort((a, b)=>a.y - b.y);
-  for (const it of items) it.f();
+  const bike = onBike();
+  const sp = Math.hypot(player.vx, player.vz);
+  const phase = sp > 0.2 ? player.walk : 0;
+  const frame = Math.round((phase % 1) * 8);
+  const a = W3.actor('player');
+  a.paint(`${player.dir}${frame}${bike?'b':''}`, c=>{
+    if (bike) drawBike(c, player.dir, frame % 2 === 0);
+    drawActor(c, 0, 16 - (bike ? 6 : 0), leader, player.dir, bike ? 0 : frame / 8);
+  });
+  a.place(player.px, player.pz, 0, bike ? player.lean : 0, player.hop);
 
-  if (!map.indoor){
-    // ombre delle nuvole che scorrono sul paesaggio
-    const ct = ts / 1000;
-    ctx.fillStyle = 'rgba(12,16,44,.10)';
-    for (let i=0; i<3; i++){
-      const span = mw + 700;
-      const cx2 = ((ct * (9 + i*4) + i * 900) % span) - 350 - camX;
-      const cy2 = ((i * 530 + ct * 3) % (mh + 300)) - 150 - camY;
-      ctx.beginPath();
-      ctx.ellipse(cx2, cy2, 200 + i*50, 90 + i*25, 0.3, 0, Math.PI*2);
-      ctx.fill();
-    }
-    // particelle di luce che fluttuano
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (let i=0; i<12; i++){
-      const px2 = ((i*173 + ts * (0.012 + (i%4)*0.004)) % (W + 60)) - 30;
-      const py2 = ((i*271 - ts * (0.008 + (i%3)*0.005)) % (H + 60) + (H + 60)) % (H + 60) - 30;
-      const a = 0.10 + Math.sin(ts/600 + i*1.7) * 0.08;
-      if (a <= 0.02) continue;
-      ctx.fillStyle = `rgba(255,240,190,${a})`;
-      ctx.beginPath(); ctx.arc(px2, py2, 1.6 + (i%3)*0.7, 0, Math.PI*2); ctx.fill();
-    }
-    ctx.restore();
+  W3.endActors();
+  W3.render(dt, { x:player.px, z:player.pz }, {
+    velocity: { x:player.vx, z:player.vz },
+    zoomOut: bike ? Math.min(2, sp * 0.2) : 0,   // in velocità la camera si alza
+  });
+}
+
+// bicicletta sotto il personaggio: due ruote e telaio (coordinate sprite 48x64)
+function drawBike(d, dir, spin){
+  const ox = 0, oy = 16;
+  const side = dir === 'left' || dir === 'right';
+  d.fillStyle = '#22222c';
+  if (side){
+    d.fillRect(ox+8, oy+36, 10, 10);
+    d.fillRect(ox+30, oy+36, 10, 10);
+    d.fillStyle = '#c0392b';
+    d.fillRect(ox+12, oy+38, 24, 3);
+  } else {
+    d.fillRect(ox+20, oy+40, 8, 10);
+    d.fillStyle = '#c0392b';
+    d.fillRect(ox+13, oy+29, 22, 3);
+    d.fillRect(ox+13, oy+26, 3, 4);
+    d.fillRect(ox+32, oy+26, 3, 4);
   }
-
-  // luce ambientale calda attorno al giocatore
-  const lg2 = ctx.createRadialGradient(pSX+TILE/2, pSY+TILE/2, 30, pSX+TILE/2, pSY+TILE/2, H*0.85);
-  lg2.addColorStop(0, 'rgba(255,235,185,.12)');
-  lg2.addColorStop(0.6, 'rgba(255,235,185,.04)');
-  lg2.addColorStop(1, 'rgba(30,30,80,.14)');
-  ctx.fillStyle = lg2;
-  ctx.fillRect(0, 0, W, H);
+  d.fillStyle = spin ? '#8a8a9a' : '#5a5a6a';
+  if (side){ d.fillRect(ox+11, oy+39, 4, 4); d.fillRect(ox+33, oy+39, 4, 4); }
+  else d.fillRect(ox+22, oy+43, 4, 4);
 }
 
 function loop(ts){
   const dt = Math.min(0.05, (ts - lastTs) / 1000 || 0.016);
   lastTs = ts;
   update(dt);
-  render(ts);
+  render(dt);
   raf = requestAnimationFrame(loop);
 }
 
@@ -464,9 +607,10 @@ function loop(ts){
 registerScreen('world', {
   el,
   enter(params){
+    G.s.quests ||= {};  // compatibilità con i salvataggi precedenti
     if (!params?.resume){
       map = MAPS[G.s.map];
-      player = { x:G.s.x, y:G.s.y, dir:'down', moving:false, prog:0, fromX:G.s.x, fromY:G.s.y };
+      player = newPlayer(G.s.x, G.s.y);
       hudLoc.textContent = map.name;
       playMusic(map.music || 'world');
       checkEnterEvents();
@@ -474,6 +618,7 @@ registerScreen('world', {
       map = MAPS[G.s.map];
       playMusic(map.music || 'world');
     }
+    if (!W3) W3 = new World3D(canvas);
     lastTs = performance.now();
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(loop);

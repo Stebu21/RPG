@@ -118,10 +118,9 @@ html, body {
 /* ---------- mondo ---------- */
 #screen-world { background:#0a0c16; }
 #world-canvas {
-  position:absolute; left:50%; top:50%;
-  transform:translate(-50%, -50%);
-  width:min(100vw, 166.6vh);
-  max-height:100vh;
+  position:absolute; inset:0;
+  width:100vw; height:100vh;
+  display:block;
 }
 #world-vignette {
   position:absolute; inset:0; pointer-events:none; z-index:5;
@@ -217,7 +216,11 @@ html, body {
 /* ---------- battaglia ---------- */
 #screen-battle { display:flex; flex-direction:column; background:#10102a; }
 #battle-zone { flex:1; position:relative; min-height:0; overflow:hidden; }
-#battle-canvas { position:absolute; inset:0; }
+#battle-canvas {
+  position:absolute; inset:0;
+  image-rendering:pixelated;
+  image-rendering:crisp-edges;
+}
 #battle-pops { position:absolute; inset:0; pointer-events:none; z-index:5; }
 .dmg-pop {
   position:absolute; transform:translateX(-50%);
@@ -272,6 +275,23 @@ html, body {
 #battle-fx { position:absolute; inset:0; pointer-events:none; z-index:8; }
 .flash { position:absolute; inset:0; animation:flashfx .35s forwards; }
 @keyframes flashfx { 0%{opacity:.85} 100%{opacity:0} }
+
+/* transizione a vortice all'inizio della battaglia (stile FF) */
+.battle-swirl {
+  position:absolute; inset:-30%;
+  z-index:30; pointer-events:none;
+  background:
+    conic-gradient(from 0deg,
+      rgba(8,8,26,1) 0deg, rgba(60,40,120,.95) 60deg,
+      rgba(8,8,26,1) 120deg, rgba(120,80,200,.9) 200deg,
+      rgba(8,8,26,1) 260deg, rgba(60,40,120,.95) 320deg, rgba(8,8,26,1) 360deg);
+  animation:swirlfx .95s cubic-bezier(.4,.0,.6,1) forwards;
+}
+@keyframes swirlfx {
+  0%   { transform:rotate(0turn) scale(1.6); opacity:1; }
+  70%  { opacity:1; }
+  100% { transform:rotate(1.5turn) scale(0.001); opacity:0; }
+}
 
 /* ---------- menu ---------- */
 #screen-menu {

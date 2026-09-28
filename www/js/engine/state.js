@@ -57,7 +57,7 @@ function newChar(id, level=1){
 
 export function newGame(){
   return {
-    version: 1,
+    version: 2,
     party: ['ste','riki'],
     reserve: [],
     chars: { ste:newChar('ste',3), riki:newChar('riki',3) },
@@ -65,8 +65,9 @@ export function newGame(){
     x: 9, y: 8, dir: 'down',
     flags: {},
     chests: {},
-    gold: 220,
-    items: { pozione: 6, etere: 2, antidoto: 2 },
+    quests: {},
+    gold: 350,
+    items: { pozione: 8, etere: 3, antidoto: 2, coda_fenice: 1 },
     steps: 0,
     playMin: 0,
   };

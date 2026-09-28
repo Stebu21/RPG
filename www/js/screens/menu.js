@@ -5,6 +5,7 @@ import { ABILITIES } from '../data/abilities.js';
 import { ITEMS } from '../data/items.js';
 import { MAPS, SIGILLI } from '../data/maps.js';
 import { missionText } from '../data/story.js';
+import { QUESTS, questProgressText } from '../data/quests.js';
 import { G, statsOf, expToNext } from '../engine/state.js';
 import { saveGame, SLOTS, listSaves } from '../engine/save.js';
 import { drawPortrait } from '../engine/sprites.js';
@@ -134,11 +135,33 @@ function renderItemsTab(){
     const row = document.createElement('div');
     row.className = 'item-row';
     row.innerHTML = `<div><b>${it.name}</b> x${G.s.items[id]}<br><small style="color:#9ab">${it.desc}</small></div>`;
-    const use = document.createElement('button');
-    use.className = 'btn';
-    use.textContent = 'USA';
-    use.onclick = ()=>renderItemUse(id);
-    row.appendChild(use);
+    if (id === 'bici'){
+      const use = document.createElement('button');
+      use.className = 'btn';
+      use.textContent = G.s.flags.bici_on ? 'SCENDI' : 'PEDALA';
+      use.onclick = ()=>{
+        G.s.flags.bici_on = !G.s.flags.bici_on;
+        sfx('confirm');
+        renderItemsTab();
+      };
+      row.appendChild(use);
+    } else if (it.type === 'key'){
+      const tag = document.createElement('small');
+      tag.style.cssText = 'color:#7ec8ff;padding:4px';
+      tag.textContent = '🔑 sempre attive';
+      row.appendChild(tag);
+    } else if (it.type !== 'quest'){
+      const use = document.createElement('button');
+      use.className = 'btn';
+      use.textContent = 'USA';
+      use.onclick = ()=>renderItemUse(id);
+      row.appendChild(use);
+    } else {
+      const tag = document.createElement('small');
+      tag.style.cssText = 'color:#ffd76a;padding:4px';
+      tag.textContent = '📜 missione';
+      row.appendChild(tag);
+    }
     contentEl.appendChild(row);
   }
 }
@@ -186,6 +209,7 @@ const MAP_COLORS = {
   '#':'#8a6d54', 'D':'#b07c3e', 'C':'#f3eee2', 'W':'#9a9183',
   'w':'#a8784a', 'R':'#a8333a', 'M':'#3a3344', 'K':'#caa36a',
   'l':'#5b78d6', 'Z':'#6e4f2c', 'O':'#8a6334', 'H':'#e8e2d4', 'P':'#888a9a',
+  'E':'#2f7a2a', 'Q':'#7ec8ff', 'b':'#8a6334', 'm':'#d9a05a', 'G':'#dfe6ef', 'U':'#8fa898',
   '1':'#d9534f', '2':'#d9534f', '3':'#d9534f', '4':'#d9534f', '5':'#d9534f',
   'S':'#ffd76a', 'A':'#5b78d6',
 };
@@ -257,11 +281,29 @@ function renderMissionTab(){
   for (const s of SIGILLI){
     sig += `<div class="item-row"><span>${G.s.flags[s] ? '🔆' : '⬜'} ${names[s]}</span></div>`;
   }
+  // missioni secondarie: attive, completate e da scoprire
+  const qs = G.s.quests || {};
+  let side = '';
+  for (const id of Object.keys(qs)){
+    const q = QUESTS[id];
+    if (!q) continue;
+    const prog = questProgressText(G.s, id);
+    const done = qs[id].done;
+    side += `<div class="item-row"><div>
+      <b>${done ? '✅' : '📜'} ${q.name}</b> <small style="color:#ffd76a">${q.town} — ${q.giver}</small><br>
+      <small style="color:#9ab">${done ? 'Completata.' : q.desc}</small>
+      ${!done ? `<br><small style="color:#7ee787">Progresso: ${prog}</small>` : ''}
+    </div></div>`;
+  }
+  const known = Object.keys(qs).length;
+  const total = Object.keys(QUESTS).length;
+  if (!side) side = '<p style="padding:6px;font-size:11px;color:#9ab">Nessuna missione secondaria accettata. Parla con gli abitanti dei paesi: chi ha il simbolo <b style="color:#ffd76a">!</b> sopra la testa ha bisogno di te.</p>';
   contentEl.innerHTML = `
     <div class="detail-box">
-      <h3>Missione</h3>
+      <h3>Missione principale</h3>
       <p style="line-height:1.6">${missionText(G.s.flags)}</p>
       <h3 style="margin-top:10px">Sigilli delle Ore</h3>${sig}
+      <h3 style="margin-top:10px">Missioni secondarie (${known}/${total} scoperte)</h3>${side}
       <p style="margin-top:10px;font-size:11px;color:#9ab">Passi: ${G.s.steps} · Oro: ${G.s.gold}</p>
     </div>`;
 }

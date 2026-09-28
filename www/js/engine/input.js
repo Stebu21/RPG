@@ -13,6 +13,10 @@ export const Input = {
     if (this.dirs.right) return 'right';
     return null;
   },
+  // vettore analogico (diagonali comprese) per il movimento libero
+  axis(){
+    return { x:(this.dirs.right?1:0) - (this.dirs.left?1:0), y:(this.dirs.down?1:0) - (this.dirs.up?1:0) };
+  },
   takeAction(){
     if (this.actionQueued){ this.actionQueued = false; return true; }
     return false;

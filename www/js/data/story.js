@@ -40,6 +40,10 @@ export const NPCS = {
              'Senza tutti e quattro, nessuno può salire al Santuario del Sacro Monte.'] },
     { name:'Rettore Cid', lines:['...'] },
   ],
+  accademia_bibliotecaria: [
+    { name:'Bibliotecaria', lines:['Silenzio in biblioteca! ...Ah, siete voi. I tomi sui Sigilli delle Ore sono spariti tutti, guarda caso, la notte in cui è arrivata Eterna.',
+                                   'Se trovate libri in giro per la provincia, riportateli. Le multe per il ritardo si accumulano anche in tempo di crisi.'] },
+  ],
   accademia_allievo: [
     { name:'Allievo', lines:['Dicono che a Vedano Olona la vecchia filanda si sia... svegliata. Brrr.'] },
   ],
@@ -57,6 +61,18 @@ export const NPCS = {
   ],
   varese_bimba: [
     { name:'Bimba', lines:['La mamma dice che se faccio i capricci arriva la Strega del Tempo e mi fa diventare vecchia!'] },
+  ],
+  varese_mercante: [
+    { name:'Mercante', lines:['Frutta di stagione, stoffe di Gallarate, castagne del Campo dei Fiori!',
+                              'Col tempo impazzito vendo pesche a novembre. Non lamentiamoci di tutto, va’.'] },
+  ],
+  jerago_bambino: [
+    { name:'Bambino', lines:['La fontana esprime i desideri! Io ho chiesto un drago. Il papà dice di chiedere pioggia, che è più utile.',
+                             'Se sali al castello saluta i fantasmi! Sono simpatici, ma stonano quando cantano.'] },
+  ],
+  samarate_nonna: [
+    { name:'Nonna del parco', lines:['Mio marito costruiva le ali degli aerei, qui alle officine. Diceva: «Samarate ha sempre guardato in su».',
+                                     'Anche voi guardate in su, giovani. Ma prima, una caramella? Ne ho di menta e di drago.'] },
   ],
   varese_guardia: [
     { if:{ has:['sigillo_alba'], not:['sigillo_meriggio'] }, name:'Guardia',
