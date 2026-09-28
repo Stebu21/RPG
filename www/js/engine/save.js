@@ -23,7 +23,7 @@ function hashPin(pin, salt){
 export function register(name, pin){
   name = (name||'').trim();
   if (name.length < 2) return { ok:false, msg:'Nome troppo corto (min 2 caratteri).' };
-  if ((pin||'').length < 4) return { ok:false, msg:'PIN troppo corto (min 4 cifre).' };
+  if ((pin||'').length < 4) return { ok:false, msg:'PIN troppo corto (almeno 4 caratteri, lettere o numeri).' };
   const all = loadAll();
   const key = name.toLowerCase();
   if (all[key]) return { ok:false, msg:'Questo nome esiste già.' };

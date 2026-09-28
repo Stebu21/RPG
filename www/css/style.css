@@ -239,6 +239,26 @@ html, body {
 #btn-run.on { background:rgba(60,220,160,.95); }
 #btn-ride.hidden { display:none; }
 
+/* ---------- telefono e tablet: i testi non coprono mai i comandi ---------- */
+@media (pointer:coarse){
+  /* pulsantiera a destra: A grande in basso a destra, B a sinistra di A, corsa e mezzo sopra */
+  #btn-action { right:16px; bottom:calc(max(16px, env(safe-area-inset-bottom)) + 44px); }
+  #btn-back   { right:88px; bottom:max(14px, env(safe-area-inset-bottom)); }
+  #btn-run    { right:96px; bottom:calc(max(14px, env(safe-area-inset-bottom)) + 78px); }
+  #btn-ride   { right:22px; bottom:calc(max(16px, env(safe-area-inset-bottom)) + 118px); }
+  /* dialoghi sopra la pulsantiera; scelte (negozio, locanda) in alto */
+  #dialog-box { bottom:calc(max(14px, env(safe-area-inset-bottom)) + 186px); }
+  #dialog-text { font-size:14px; min-height:40px; }
+  #choice-box { top:58px; bottom:auto; right:10px; left:auto; max-width:min(420px, 92vw); max-height:calc(100% - 58px - 300px); min-height:120px; }
+  #autosave-toast { top:52px; bottom:auto; left:0; right:0; margin:0 auto; width:max-content; }   /* non sopra il tasto B */
+}
+/* telefono in orizzontale: il dialogo sta fra il D-pad e i pulsanti */
+@media (pointer:coarse) and (orientation:landscape) and (max-height:560px){
+  #dialog-box { left:170px; right:176px; width:auto; transform:none; bottom:max(10px, env(safe-area-inset-bottom)); padding:8px 12px 14px; }
+  #dialog-text { font-size:13px; line-height:1.4; min-height:34px; }
+  #choice-box { top:52px; max-height:calc(100% - 52px - 110px); right:176px; }
+}
+
 /* ---------- battaglia ---------- */
 #screen-battle { display:flex; flex-direction:column; background:#10102a; }
 #battle-zone { flex:1; position:relative; min-height:0; overflow:hidden; }
