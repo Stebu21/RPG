@@ -588,7 +588,7 @@ function busStops(P, list, tiles, streets){
     // mai sulla strada: una palina in un vicolo largo una casella lo chiuderebbe
     const spot = [5, 4, 3, 2, 1, 0].map(i=>p.free?.[i]).find(c=>c && !used.has(c[0] + ',' + c[1]) && '.:'.includes(tiles[c[1]][c[0]])
       && ![[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy])=>'dD'.includes(tiles[c[1] + dy]?.[c[0] + dx])));   // né davanti a una porta
-    if (!spot) continue;
+    if (!spot || list.some(t=>t.type === 'stop' && Math.hypot(t.x - spot[0], t.y - spot[1]) < 8)) continue;   // due paline a pochi passi non servono
     used.add(spot[0] + ',' + spot[1]);
     // nome: la casa vera (es. «Casa di Via Monetti 22») o il ruolo del luogo
     const door = p.door && list.find(t=>t.type === 'portal' && t.x === p.door[0] && t.y === p.door[1]);
