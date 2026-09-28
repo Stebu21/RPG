@@ -57,6 +57,9 @@ function seeThrough(m){
   m.customProgramCacheKey = ()=>'xray';
   return m;
 }
+// stato che appartiene alla mappa costruita (messo da parte insieme al paese quando si entra in casa)
+const STASH_KEYS = ['mapGroup', 'map', 'mapName', 'indoor', 'animated', 'lamps', 'windows', 'lampMat', 'winMat', 'roseMat',
+  'dynMats', 'W', 'H', 'getCh', 'streets', 'lampLights', 'water', 'weather', 'built', 'mergedCount', '_lampT'];
 const mat = (color, o={})=>seeThrough(new THREE.MeshStandardMaterial({ color, roughness:0.85, metalness:0, ...o }));
 
 function canvasTex(w, h, paint, repeat){
@@ -263,7 +266,9 @@ function addBox(group, w, h, d, material, x, y, z, cast=true){
 export class World3D {
   constructor(canvas){
     this.canvas = canvas;
-    const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+    // niente MSAA sul canvas: la scena passa dal post-processing (render target senza MSAA), sul canvas
+    // arriva solo un quadrato a tutto schermo, dove l'antialiasing non cambia nulla ma costa memoria e banda
+    const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'high-performance' });
     r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -357,6 +362,24 @@ export class World3D {
 
   // ---------- costruzione della mappa ----------
   build(map, mapName, triggers){
+    // uscendo da una casa si ritrova il paese già costruito (erano secondi di attesa a ogni porta)
+    if (this.stash && this.stash.map === map && this.stash.mapName === mapName){
+      this.dispose();
+      Object.assign(this, this.stash); this.stash = null;
+      this.scene.add(this.mapGroup);
+      this.finishScene();
+      return;
+    }
+    if (map.indoor && this.mapGroup && !this.indoor){
+      // si entra in una casa: il paese resta da parte, senza i personaggi (si ricreano da soli)
+      for (const a of this.actors.values()){ this.mapGroup.remove(a.mesh); a.dispose(); }
+      this.actors.clear();
+      this.scene.remove(this.mapGroup);
+      this.stash = Object.fromEntries(STASH_KEYS.map(k=>[k, this[k]]));
+      this.mapGroup = null;
+    } else if (!map.indoor && this.stash){
+      this.disposeGroup(this.stash.mapGroup); this.stash = null;   // si va altrove: il paese messo da parte non serve più
+    }
     this.dispose();
     textures();
     const g = this.mapGroup = new THREE.Group();
@@ -411,14 +434,50 @@ export class World3D {
     if (this.lamps.length){
       for (let i=0; i<6; i++){ const l = new THREE.PointLight(0xffb870, 0, 10, 1.5); l.position.y = 2; g.add(l); this.lampLights.push(l); }
     }
+    this.splitInstances(g);
     this.mergeStatic(g);
+    this.freezeStatic(g);
 
-    // luce: cielo e ombre in base all'ora reale
-    this.setupLighting(W, H);
     if (!this.indoor) this.buildWeather(g);
+    this.finishScene();
+  }
+
+  // luce: cielo e ombre in base all'ora reale, nebbia e sfondo
+  finishScene(){
+    this.setupLighting(this.W, this.H);
     this.scene.fog = this.indoor ? null : new THREE.Fog(0xbfd6ea, 40, 160);
     this.sky.visible = !this.indoor;
     this.scene.background = this.indoor ? new THREE.Color(0x0b0a10) : null;
+  }
+
+  // Erba, alberi e fiori sono InstancedMesh grandi quanto la mappa: la loro sfera di ingombro
+  // è sempre nell'inquadratura e si disegnavano tutte le istanze (e di nuovo per le ombre).
+  // Divise in blocchi di 16x16 caselle, three.js scarta quelle fuori schermo: stessa scena.
+  splitInstances(g){
+    const S = 16, m = new THREE.Matrix4(), p = new THREE.Vector3(), c = new THREE.Color();
+    const big = [];
+    g.traverse(o=>{ if (o.isInstancedMesh && o.count > 64) big.push(o); });
+    for (const im of big){
+      const parts = new Map();
+      for (let i = 0; i < im.count; i++){
+        im.getMatrixAt(i, m); p.setFromMatrixPosition(m);
+        const k = Math.floor(p.x / S) + ',' + Math.floor(p.z / S);
+        if (!parts.has(k)) parts.set(k, []);
+        parts.get(k).push(i);
+      }
+      if (parts.size < 2) continue;
+      for (const ids of parts.values()){
+        const part = new THREE.InstancedMesh(im.geometry, im.material, ids.length);
+        part.castShadow = im.castShadow; part.receiveShadow = im.receiveShadow;
+        ids.forEach((i, j)=>{
+          im.getMatrixAt(i, m); part.setMatrixAt(j, m);
+          if (im.instanceColor){ im.getColorAt(i, c); part.setColorAt(j, c); }
+        });
+        part.computeBoundingSphere();
+        im.parent.add(part);
+      }
+      im.parent.remove(im); im.dispose();   // dispose() libera solo gli attributi d'istanza: la geometria è condivisa
+    }
   }
 
   // Fonde le mesh statiche con lo stesso materiale in blocchi di 16x16 caselle:
@@ -436,7 +495,7 @@ export class World3D {
       if (o.geometry.attributes.position.count > 20000) return;           // il terreno resta com'è
       wp.setFromMatrixPosition(o.matrixWorld);
       const mk = keyOf(o.material);
-      const k = mk + '#' + Math.floor(wp.x / CH) + ',' + Math.floor(wp.z / CH) + '#' + o.castShadow;
+      const k = mk + '#' + Math.floor(wp.x / CH) + ',' + Math.floor(wp.z / CH) + '#' + o.castShadow + '#' + !!o.geometry.index;
       if (!buckets.has(k)){ buckets.set(k, []); mats.set(k, o.material); }
       buckets.get(k).push(o);
     });
@@ -444,7 +503,7 @@ export class World3D {
     for (const [k, list] of buckets){
       if (list.length < 2) continue;
       const geos = list.map(o=>{
-        let geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        const geo = o.geometry.clone();   // gli indici restano: vertici condivisi, meno lavoro per la GPU
         for (const a of Object.keys(geo.attributes)) if (!['position','normal','uv'].includes(a)) geo.deleteAttribute(a);
         if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
         geo.applyMatrix4(o.matrixWorld);
@@ -460,6 +519,24 @@ export class World3D {
       merged += list.length;
     }
     this.mergedCount = merged;
+  }
+
+  // Dopo la fusione restano migliaia di gruppi vuoti (finestre, porte) e oggetti che non si
+  // muovono mai: via i primi, matrici calcolate una volta sola per i secondi. three.js non
+  // deve più ricomporle e visitarle a ogni fotogramma. Gli oggetti animati (userData.dyn) e le luci restano liberi.
+  freezeStatic(g){
+    const prune = o=>{
+      for (const c of [...o.children]) prune(c);
+      if (o !== g && o.type === 'Group' && !o.children.length && !o.userData.dyn) o.parent.remove(o);
+    };
+    prune(g);
+    g.updateMatrixWorld(true);
+    const freeze = o=>{
+      if (o.userData.dyn || o.isLight) return;          // si muove: il sottoalbero resta automatico
+      o.matrixAutoUpdate = false;
+      for (const c of o.children) freeze(c);
+    };
+    for (const c of g.children) freeze(c);
   }
 
   // cartelli con il nome delle vie (dati OpenStreetMap), accanto alla strada
@@ -516,14 +593,17 @@ export class World3D {
   dispose(){
     if (!this.mapGroup) return;
     this.scene.remove(this.mapGroup);
-    this.mapGroup.traverse(o=>{
+    this.disposeGroup(this.mapGroup);
+    for (const a of this.actors.values()) a.dispose();
+    this.actors.clear();
+    this.mapGroup = null;
+  }
+  disposeGroup(group){
+    group.traverse(o=>{
       o.geometry?.dispose();
       const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
       for (const m of ms){ if (m.map && m.map !== TEX.roof && m.map !== TEX.plaster && m.map !== TEX.brick && m.map !== TEX.stone && m.map !== TEX.wood && m.map !== TEX.leaves) m.map.dispose(); m.dispose(); }
     });
-    for (const a of this.actors.values()) a.dispose();
-    this.actors.clear();
-    this.mapGroup = null;
   }
 
   // Campo dei Fiori e il Sacro Monte a nord, colline moreniche attorno

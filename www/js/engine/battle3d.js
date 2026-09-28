@@ -107,7 +107,7 @@ const ELEM_COL = {
 export class BattleStage {
   constructor(canvas){
     this.canvas = canvas;
-    const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+    const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias:false, powerPreference:'high-performance' });   // come nel mondo: si passa dal post-processing
     r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace;

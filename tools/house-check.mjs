@@ -82,7 +82,10 @@ for (const [town, r] of Object.entries(report)){
     assert.equal(inside, t.to.map, `non si entra nella casa ${t.to.map}`);
     const name = await page.$eval('#hud-location', e=>e.textContent);
     if (t === r.sample[0]){ await wait(400); await page.screenshot({ path:`tools/h-${town}.png` }); console.log(' dentro:', name); }
-    await step('ArrowDown', 1300); await skip();
+    // verso l'uscita, rilasciando il tasto appena si è fuori (il paese ricompare subito)
+    await page.keyboard.down('ArrowDown');
+    for (let i = 0; i < 40 && (await ev(async ()=>(await import('./js/engine/state.js')).G.s.map)) !== town; i++) await wait(50);
+    await page.keyboard.up('ArrowDown'); await wait(150); await skip();
     const back = await ev(async ()=>{ const { G } = await import('./js/engine/state.js'); return [G.s.map, G.s.x, G.s.y]; });
     assert.deepEqual(back, [town, exit.x, exit.y], `uscita sbagliata da ${t.to.map}`);
     visited++;

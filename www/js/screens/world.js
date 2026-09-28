@@ -744,7 +744,9 @@ function render(dt){
   W3.beginActors();
 
   // NPC e personaggi delle missioni: si girano verso il giocatore quando è vicino
-  for (const t of activeTriggers()){
+  // (niente filter() a ogni fotogramma: i paesi hanno migliaia di porte, qui servono solo gli oggetti visibili)
+  for (const t of map.triggers || []){
+    if (t.type === 'portal' || (t.hideFlag && G.s.flags[t.hideFlag])) continue;
     if (t.type === 'chest'){ W3.chest(t.id, t.x, t.y, !!G.s.chests[t.id]); continue; }
     if (t.type === 'vehicle'){
       if (G.s.items[t.vehicle] > 0) continue;              // già preso: lo porti con te
@@ -873,4 +875,4 @@ export function initWorld(){
 
 export { onAction as worldAction };
 // per i test: posizione continua del giocatore e caselle calpestabili
-export const debugWorld = { player:()=>player, follower:()=>follower, walkable:(x, y)=>walkable(x, y), map:()=>map };
+export const debugWorld = { w3:()=>W3, player:()=>player, follower:()=>follower, walkable:(x, y)=>walkable(x, y), map:()=>map };
