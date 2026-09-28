@@ -20,7 +20,7 @@ export const MOBILE_ZOOM = ()=>{
   const touch = window.matchMedia?.('(pointer: coarse)').matches;
   const small = Math.min(window.innerWidth, window.innerHeight) < 600;
   if (!(touch || small)) return 1;
-  return window.innerWidth < window.innerHeight ? 2.2 : 1.55;   // in verticale la vista orizzontale è stretta: più lontano
+  return window.innerWidth < window.innerHeight ? 1.6 : 1.25;   // in verticale la vista orizzontale è stretta: più lontano
 };
 function hash(x, y, s=0){
   let h = (x*374761393 + y*668265263 + s*2147483647) | 0;
@@ -1281,7 +1281,7 @@ export class World3D {
     tgt.add(speedLook);
     const zo = (opts.zoomOut||0) + (this.mapName === 'world' ? 4 : 0);
     const close = window.__closeup;   // solo per gli screenshot di verifica
-    const offset = close ? new THREE.Vector3(0, 1.6, 2.6) : indoor ? new THREE.Vector3(0, 6.4, 6.4) : new THREE.Vector3(0, 6.6 + zo, 7.2 + zo*0.8);
+    const offset = close ? new THREE.Vector3(0, 1.6, 2.6) : indoor ? new THREE.Vector3(0, 6.4, 6.4) : new THREE.Vector3(0, 14 + zo, 8 + zo*0.8);   // ~60° dall'alto: le strade si vedono tra i tetti
     if (!close) offset.multiplyScalar(MOBILE_ZOOM());   // su telefono la camera si allontana
     if (window.__closeup) tgt.y = 1.05;
     const k = 1 - Math.exp(-dt * 5);
