@@ -1,6 +1,6 @@
 {
   "appId": "it.cronache.varese",
-  "appName": "Cronache di Varese",
+  "appName": "Hourbreakers",
   "webDir": "www",
   "android": {
     "allowMixedContent": false

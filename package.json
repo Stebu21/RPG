@@ -1,7 +1,7 @@
 {
-  "name": "cronache-di-varese",
+  "name": "hourbreakers",
   "version": "1.0.0",
-  "description": "RPG in italiano ambientato nella provincia di Varese",
+  "description": "Hourbreakers — RPG in italiano ambientato nella provincia di Varese",
   "main": "index.js",
   "directories": {
     "doc": "docs"
