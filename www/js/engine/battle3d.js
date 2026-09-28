@@ -10,6 +10,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { buildEnvironment, areaTint } from './battleEnv.js';
 import { Person } from './character3d.js';
 import { drawMonster } from './sprites.js';
 
@@ -113,8 +115,30 @@ export class BattleStage {
     this.camera = new THREE.PerspectiveCamera(38, 2, 0.1, 200);
     this.composer = new EffectComposer(r);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.7, 0.5, 0.8);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.5, 0.45, 0.95);   // solo le vere fonti di luce brillano
     this.composer.addPass(this.bloom);
+    // grading cinematografico: tinta della zona, contrasto, vignetta, bordi sfocati
+    this.grade = new ShaderPass({
+      uniforms:{ tDiffuse:{ value:null }, res:{ value:new THREE.Vector2(1, 1) }, tint:{ value:new THREE.Vector3(1, 1, 1) }, flash:{ value:0 } },
+      vertexShader:'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+      fragmentShader:`uniform sampler2D tDiffuse; uniform vec2 res; uniform vec3 tint; uniform float flash; varying vec2 vUv;
+        void main(){
+          float d = distance(vUv, vec2(0.5, 0.55));
+          vec2 px = (1.0 / res) * smoothstep(0.35, 0.75, d) * 2.5;
+          vec4 c = texture2D(tDiffuse, vUv) * 0.4;
+          c += texture2D(tDiffuse, vUv + vec2(px.x, px.y)) * 0.15; c += texture2D(tDiffuse, vUv - vec2(px.x, px.y)) * 0.15;
+          c += texture2D(tDiffuse, vUv + vec2(px.x, -px.y)) * 0.15; c += texture2D(tDiffuse, vUv - vec2(px.x, -px.y)) * 0.15;
+          // aberrazione cromatica sui colpi critici
+          c.r = mix(c.r, texture2D(tDiffuse, vUv + vec2(0.004, 0.) * flash).r, flash);
+          c.b = mix(c.b, texture2D(tDiffuse, vUv - vec2(0.004, 0.) * flash).b, flash);
+          c.rgb *= tint;
+          float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+          c.rgb = max(mix(vec3(l), c.rgb, 1.12), 0.0);             // un filo più saturo (mai negativo: siamo in HDR lineare)
+          c.rgb *= 1.0 - 0.42 * smoothstep(0.4, 0.95, d);           // vignetta
+          gl_FragColor = c;
+        }`,
+    });
+    this.composer.addPass(this.grade);
     this.composer.addPass(new OutputPass());
     this.dot = dotTexture(); this.rune = runeTexture();
     this.fx = [];
@@ -127,72 +151,22 @@ export class BattleStage {
     this.W = W; this.H = H;
     this.renderer.setSize(W, H, false);
     this.composer.setSize(W, H);
+    const pr = this.renderer.getPixelRatio();
+    this.grade.uniforms.res.value.set(W * pr, H * pr);
     this.camera.aspect = W / H; this.camera.updateProjectionMatrix();
   }
 
   // ---------- costruzione dell'arena ----------
-  setup(B, paintBackdrop){
+  setup(B){
     const s = this.scene;
     while (s.children.length) s.remove(s.children[0]);
     this.fx = [];
     this.B = B;
-    // fondale: il dipinto della zona su un semicilindro dietro l'arena
-    const bc = document.createElement('canvas'); bc.width = 2048; bc.height = 900;
-    this.bgCanvas = bc; this.paintBackdrop = paintBackdrop; this.bgT = 0;
-    paintBackdrop(bc.getContext('2d'), bc.width, bc.height, 0);
-    this.bgTex = new THREE.CanvasTexture(bc); this.bgTex.colorSpace = THREE.SRGBColorSpace;
-    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, 17, 64, 1, true, Math.PI*0.62, Math.PI*1.12),
-      new THREE.MeshBasicMaterial({ map:this.bgTex, side:THREE.BackSide, fog:false }));
-    cyl.position.set(0, 2.0, 2); s.add(cyl);   // l'orizzonte dipinto (~62% d'altezza) cade a terra
-
-    // colori ricavati dal dipinto: cielo per la luce, terreno per il suolo
-    const px = bc.getContext('2d');
-    const pick = (x, y)=>{ const d = px.getImageData(x, y, 1, 1).data; return new THREE.Color(`rgb(${d[0]},${d[1]},${d[2]})`); };
-    const sky = pick(1024, 30), ground = pick(1024, 870), horizon = pick(1024, 560);
-    s.fog = new THREE.Fog(horizon, 14, 30);
-    s.background = sky;
-
-    const gc = document.createElement('canvas'); gc.width = gc.height = 512;
-    const g = gc.getContext('2d');
-    g.fillStyle = '#' + ground.getHexString(); g.fillRect(0, 0, 512, 512);
-    for (let i=0; i<4000; i++){
-      const v = Math.random();
-      g.fillStyle = v > 0.5 ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.09)';
-      g.fillRect(Math.random()*512, Math.random()*512, 2 + Math.random()*4, 2 + Math.random()*4);
-    }
-    const gt = new THREE.CanvasTexture(gc); gt.colorSpace = THREE.SRGBColorSpace;
-    gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(6, 6);
-    const floor = new THREE.Mesh(new THREE.CircleGeometry(24, 64), new THREE.MeshStandardMaterial({ map:gt, roughness:1 }));
-    floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; s.add(floor);
-
-    // ciuffi d'erba e sassi sparsi per dare profondità al suolo
-    const tuft = new THREE.InstancedMesh(new THREE.ConeGeometry(0.05, 0.35, 3), new THREE.MeshStandardMaterial({ color:ground.clone().multiplyScalar(1.25) }), 380);
-    const rock = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.18, 0), new THREE.MeshStandardMaterial({ color:0x8a8478, flatShading:true }), 26);
-    const m = new THREE.Object3D();
-    for (let i=0; i<380; i++){
-      const a = Math.random()*Math.PI*2, d = rnd(1.5, 14);
-      m.position.set(Math.cos(a)*d, 0.15, Math.sin(a)*d - 2); m.rotation.set(rnd(-.3,.3), 0, rnd(-.3,.3)); m.scale.setScalar(rnd(0.6, 1.4));
-      m.updateMatrix(); tuft.setMatrixAt(i, m.matrix);
-    }
-    for (let i=0; i<26; i++){
-      const a = Math.random()*Math.PI*2, d = rnd(4.5, 13);
-      m.position.set(Math.cos(a)*d, 0.05, Math.sin(a)*d - 3); m.rotation.set(rnd(0,3), rnd(0,3), 0); m.scale.set(rnd(.6,2), rnd(.4,1.2), rnd(.6,2));
-      m.updateMatrix(); rock.setMatrixAt(i, m.matrix);
-    }
-    rock.castShadow = true; rock.receiveShadow = true;
-    s.add(tuft, rock);
-
-    // luci
-    s.add(new THREE.HemisphereLight(sky.clone().lerp(new THREE.Color(1,1,1), 0.5), ground, 1.1));
-    const sun = new THREE.DirectionalLight(0xfff0dd, 2.4);
-    sun.position.set(4, 9, 6); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(sun.shadow.camera, { left:-8, right:8, top:8, bottom:-8, near:1, far:30 });
-    sun.shadow.camera.updateProjectionMatrix(); sun.shadow.bias = -0.0005;
-    s.add(sun);
-    if (B.boss){
-      const rim = new THREE.PointLight(0xff3050, 30, 12); rim.position.set(-4, 3, -3); s.add(rim);
-      this.rim = rim;
-    } else this.rim = null;
+    // ambiente 3D della zona (cielo, colline, monumento, erba, particelle, luci)
+    s.background = null;
+    this.env = buildEnvironment(s, B.area, B.boss);
+    this.rim = this.env.rim;
+    this.grade.uniforms.tint.value.set(...areaTint(B.area));
     // luce d'impatto riutilizzata dagli effetti
     this.impact = new THREE.PointLight(0xffffff, 0, 7, 1.5); s.add(this.impact);
 
@@ -216,12 +190,20 @@ export class BattleStage {
       const mesh = new THREE.Mesh(geo, mat); mesh.castShadow = true;
       const shadow = new THREE.Mesh(new THREE.CircleGeometry(h*0.28, 24), new THREE.MeshBasicMaterial({ color:0, transparent:true, opacity:0.35, depthWrite:false }));
       shadow.rotation.x = -Math.PI/2; shadow.position.y = 0.02;
+      // contorno: la stessa sagoma, scura e appena più grande, dietro al mostro
+      const outline = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map:tex, color:0x0a0612, transparent:true, alphaTest:0.3, side:THREE.DoubleSide }));
+      outline.scale.setScalar(1.045); outline.position.z = -0.02; mesh.add(outline);
+      let aura = null;
+      if (e.def.boss){
+        aura = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map:tex, color:0xff2050, transparent:true, opacity:0.5, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide }));
+        aura.scale.setScalar(1.12); aura.position.z = -0.04; mesh.add(aura);
+      }
       const grp = new THREE.Group(); grp.add(mesh, shadow); s.add(grp);
       const spread = eN === 1 ? [0] : eN === 2 ? [-1, 1] : eN === 3 ? [-1.5, 0, 1.5] : [-2.1, -0.7, 0.7, 2.1];
       const zc = spread[i] ?? 0;
       const home = e.def.boss ? new THREE.Vector3(-2.7, 0, -0.6) : new THREE.Vector3(-2.3 - (i % 2) * 0.7, 0, zc * 1.0);
       grp.position.copy(home);
-      e.o3 = { grp, mesh, mat, shadow, home, h, dying:false };
+      e.o3 = { grp, mesh, mat, shadow, home, h, dying:false, aura, outline };
       e.tag = document.createElement('div'); e.tag.className = 'enemy-tag';
       e.tag.innerHTML = `<span>${e.name}</span><i><b></b></i>`;
       document.getElementById('battle-pops').appendChild(e.tag);
@@ -399,7 +381,7 @@ export class BattleStage {
     const pa = this.unitPos(a, 0.5), pb = b ? this.unitPos(b, 0.5) : pa;
     this.cam.focus = pa.clone().lerp(pb, 0.5); this.cam.focusT = dur; this.cam.focusK = strength;
   }
-  hitStop(sec=0.1){ this.stopT = sec; }
+  hitStop(sec=0.1){ this.stopT = sec; this.grade.uniforms.flash.value = 1; }
 
   // ---------- frame ----------
   frame(dtReal, t, selT){
@@ -408,9 +390,8 @@ export class BattleStage {
     if (this.stopT > 0){ this.stopT -= dtReal; }
     const dt = this.stopT > 0 ? dtReal * 0.08 : dtReal;
 
-    // fondale animato (nuvole, stelle) a 10 fps
-    this.bgT += dtReal;
-    if (this.bgT > 0.1){ this.bgT = 0; this.paintBackdrop(this.bgCanvas.getContext('2d'), 2048, 900, t); this.bgTex.needsUpdate = true; }
+    this.env.update(t, dt);
+    this.grade.uniforms.flash.value *= Math.max(0, 1 - dtReal * 6);
 
     for (const e of B.enemies) this.updateEnemy(e, dt, t);
     if (B.victory) this.victoryT += dt;
@@ -471,6 +452,8 @@ export class BattleStage {
     o.mat.emissive.set(e.castT > 0 ? 0xff4060 : 0xffffff);
     o.mat.opacity = 1 - e.deadT; o.shadow.material.opacity = 0.35 * (1 - e.deadT);
     o.grp.visible = e.deadT < 1;
+    o.outline.material.opacity = 1 - e.deadT;
+    if (o.aura){ o.aura.material.opacity = (0.35 + Math.sin(t * 3) * 0.2) * (1 - e.deadT); o.aura.scale.setScalar(1.1 + Math.sin(t * 3) * 0.03); }
     // la sagoma guarda sempre la camera
     o.mesh.rotation.y = Math.atan2(this.camera.position.x - o.grp.position.x, this.camera.position.z - o.grp.position.z);
     if (e.castT > 0 && !e._castFx){ e._castFx = true; this.castCircle(e); }
