@@ -1221,10 +1221,12 @@ export function drawPortrait(canvas, character){
     x.fillStyle = col(character.color, -0.1); rr(x, cx-shW/2, 97, shW, 5, 3); x.fill();
     x.fillStyle = '#c0392b'; x.fillRect(cx-3, 110, 6, 18); x.fillRect(cx-9, 116, 18, 6);
   } else if (outfit === 'smith'){
-    // camicia scura e grembiule di cuoio con le bretelle
-    x.fillStyle = '#4a4038'; rr(x, cx-shW/2, 97, shW, 50, 18); x.fill();
-    x.fillStyle = '#6b4128'; rr(x, cx-26, 108, 52, 40, 6); x.fill();
-    x.fillStyle = '#543220'; x.fillRect(cx-30, 97, 8, 14); x.fillRect(cx+22, 97, 8, 14); x.fillRect(cx-12, 122, 24, 12);
+    // cotta di maglia, sopravveste bianca con la croce rossa dei templari, spalline d'acciaio
+    x.fillStyle = '#8a919b'; rr(x, cx-shW/2, 97, shW, 50, 18); x.fill();
+    x.fillStyle = '#a8aeb8'; for (let i = 0; i < 8; i++) x.fillRect(cx-shW/2+8+i*10, 100+(i%2)*3, 4, 2);
+    x.fillStyle = '#f2efe8'; rr(x, cx-22, 104, 44, 44, 5); x.fill();
+    x.fillStyle = '#b32424'; x.fillRect(cx-4, 108, 8, 38); x.fillRect(cx-13, 118, 26, 8);
+    x.fillStyle = '#b8bec8'; x.beginPath(); x.ellipse(cx-shW/2+8, 104, 12, 8, 0, 0, Math.PI * 2); x.fill(); x.beginPath(); x.ellipse(cx+shW/2-8, 104, 12, 8, 0, 0, Math.PI * 2); x.fill();
   } else if (outfit === 'bard'){
     // mantellina e tracolla del liuto
     x.fillStyle = col(character.color, -0.45); rr(x, cx-shW/2, 97, shW, 16, 8); x.fill();
@@ -1301,10 +1303,24 @@ export function drawPortrait(canvas, character){
   // barba
   if (look.beard){
     x.fillStyle = hair;
-    x.beginPath();
-    x.arc(cx, headCy+6, headR-4, Math.PI*0.12, Math.PI*0.88);
-    if (look.beard >= 2) x.lineTo(cx, headCy+headR+12);
-    x.closePath(); x.fill();
+    if (look.beard >= 2){
+      // barba piena (incolta): dalle basette al mento, con il taglio dei baffi sopra la bocca
+      const ext = look.beard >= 3 ? 20 : 10;
+      x.beginPath();
+      x.moveTo(cx-headR+2, headCy+7);
+      x.quadraticCurveTo(cx-headR-1, headCy+headR+2, cx, headCy+headR+ext);
+      x.quadraticCurveTo(cx+headR+1, headCy+headR+2, cx+headR-2, headCy+7);
+      x.quadraticCurveTo(cx+headR-8, headCy+12, cx+13, headCy+13);
+      x.quadraticCurveTo(cx, headCy+9, cx-13, headCy+13);
+      x.quadraticCurveTo(cx-headR+8, headCy+12, cx-headR+2, headCy+7);
+      x.closePath(); x.fill();
+      x.fillStyle = 'rgba(255,255,255,.10)';
+      for (let i = -3; i <= 3; i++) x.fillRect(cx + i*7 - 1, headCy+18 + (i&1)*4, 1.6, 6);
+    } else {
+      x.beginPath();
+      x.arc(cx, headCy+6, headR-4, Math.PI*0.12, Math.PI*0.88);
+      x.closePath(); x.fill();
+    }
   }
 
   // occhi, sopracciglia, bocca

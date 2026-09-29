@@ -76,14 +76,14 @@ export const ABILITIES = {
   gran_finale:     { name:'LIMITE: Gran Finale', mp:0, type:'mag', power:42, hits:3, element:'neutro', target:'enemies', limit:true, desc:'Fabri suona il pezzo della vita: tre accordi, tutto il pubblico al tappeto.' },
 
   // ------- PASQ (Fabbro) -------
-  martellata:      { name:'Martellata', mp:2, type:'phys', power:13, element:'neutro', target:'enemy', desc:'Un colpo di martello da forgia.' },
-  scintille:       { name:'Pioggia di Scintille', mp:7, type:'phys', power:18, element:'fuoco', target:'enemies', desc:'Il martello sull’incudine: scintille su tutti i nemici.' },
+  martellata:      { name:'Colpo d’Ascia', mp:2, type:'phys', power:13, element:'neutro', target:'enemy', desc:'Un fendente con l’ascia forgiata da lui.' },
+  scintille:       { name:'Pioggia di Scintille', mp:7, type:'phys', power:18, element:'fuoco', target:'enemies', desc:'L’ascia sull’incudine: scintille su tutti i nemici.' },
   tempra_lama:     { name:'Tempra delle Lame', mp:8, type:'buff', buff:{stat:'atk', mult:1.4, turns:4}, target:'allies', desc:'Pasq ripassa al volo le armi della squadra.' },
   ferro_rovente:   { name:'Ferro Rovente', mp:10, type:'phys', power:32, element:'fuoco', target:'enemy', desc:'Una barra appena uscita dalla forgia.' },
   scudo_forgiato:  { name:'Scudo Forgiato', mp:12, type:'buff', buff:{stat:'def', mult:1.5, turns:4}, target:'allies', desc:'Piastre battute a mano per tutti.' },
-  maglio_tuono:    { name:'Maglio del Tuono', mp:18, type:'phys', power:62, element:'tuono', target:'enemy', desc:'Il maglio cade come un fulmine.' },
+  maglio_tuono:    { name:'Ascia del Tuono', mp:18, type:'phys', power:62, element:'tuono', target:'enemy', desc:'L’ascia cade come un fulmine.' },
   colata_fusa:     { name:'Colata Fusa', mp:26, type:'phys', power:52, element:'fuoco', target:'enemies', desc:'Metallo fuso rovesciato sul campo.' },
-  martello_titano: { name:'Martello del Titano', mp:34, type:'phys', power:122, element:'terra', target:'enemy', desc:'Il martello che ha forgiato le campane di Castiglione.' },
+  martello_titano: { name:'Ascia del Titano', mp:34, type:'phys', power:122, element:'terra', target:'enemy', desc:'L’ascia che spacca la roccia di Castiglione.' },
   forgia_ardente:  { name:'LIMITE: Forgia Ardente', mp:0, type:'phys', power:60, hits:3, element:'fuoco', target:'enemies', limit:true, desc:'Pasq accende la forgia nel cuore della battaglia.' },
 
   // ------- ELLY (Curatrice) -------

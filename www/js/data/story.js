@@ -113,7 +113,7 @@ export const NPCS = {
     { name:'Pasq', lines:['Mmh. Voi cercate il Sigillo del Meriggio.',
       'È nella Collegiata, ma qualcosa di antico lo tiene stretto. E non siete i primi: stanotte un bardo è entrato a «prenderlo in prestito» per una ballata.',
       'Dietro di lui è corsa dentro la curatrice del borgo, con la borsa delle bende, urlando il suo nome. Da allora, solo rumori.',
-      'Le chiavi della Collegiata le ho forgiate io, qui nella mia bottega. Vi apro la strada: il mio martello bussa a modo suo.'] },
+      'Le chiavi della Collegiata le ho forgiate io, qui nella mia bottega. Vi apro la strada: la mia ascia bussa a modo suo.'] },
   ],
   castiglione_pittore: [
     { name:'Pittore', lines:['Studio gli affreschi di Masolino. Ultimamente... le figure dipinte mi seguono con lo sguardo.'] },
@@ -200,7 +200,7 @@ export const EVENTS = {
         ['Fabri','Non rubare: «prendere in prestito» un sigillo. Per la mia ballata. E per il bene della provincia.'],
         ['???','...kekekeke... il MIO borgo... la MIA collegiata... il MIO tempo...'],
         ['','Dall’ombra dell’abside si stacca una figura in porpora, alta tre metri.'],
-        ['Pasq','L’Ombra del Cardinale. Superba come in vita. Ottimo: il mio martello non ha mai battuto la porpora.'],
+        ['Pasq','L’Ombra del Cardinale. Superba come in vita. Ottimo: la mia ascia non ha mai tagliato la porpora.'],
       ]},
       { battle:'boss_cardinale' },
       { d:[

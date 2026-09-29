@@ -204,7 +204,7 @@ export class Person {
     const outfit = look.outfit;
     const inkSkin = look.tattoo ? skinMat(0xffffff, tattooTexture()) : skin;
     // il samurai veste un gi scuro, il mago un soprabito antracite: il colore del personaggio resta nei dettagli
-    const coatCol = outfit === 'mage' ? 0x2a2638 : outfit === 'samurai' ? 0x23262e : outfit === 'healer' ? 0xf4f1ea : outfit === 'smith' ? 0x4a4038 : null;
+    const coatCol = outfit === 'mage' ? 0x2a2638 : outfit === 'samurai' ? 0x23262e : outfit === 'healer' ? 0xf4f1ea : outfit === 'smith' ? 0x9aa0a8 : null;
     if (coatCol !== null) shirt.color.set(coatCol);
     const accent = cloth(color, { roughness:0.6 });
 
@@ -579,20 +579,27 @@ export class Person {
       this.weaponArm.el.add(wand);
       this.staff = wand; this.gem = star;
     } else if (outfit === 'smith'){
-      // fabbro: grembiule di cuoio con tasche, guanti spessi, martello in mano
-      const leather = std(0x6b4128, { roughness:0.6 });
-      const apron = new THREE.Mesh(new THREE.CylinderGeometry(0.105 * W, 0.15 * W, tH * 0.9 + legLen * 0.55, 24, 1, true, -Math.PI * 0.42, Math.PI * 0.84), std(0x6b4128, { roughness:0.6, side:THREE.DoubleSide }));
-      apron.scale.z = 0.95; apron.position.y = hipY - legLen * 0.27 + tH * 0.45 - 0.03; body.add(apron);
-      for (const sx of [-1, 1]){ const strap = new THREE.Mesh(new THREE.BoxGeometry(0.014, tH * 0.5, 0.006), leather); strap.position.set(sx * 0.045, tH * 0.78, 0.08 * W); strap.rotation.z = sx * 0.12; torso.add(strap); }
-      const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.01), std(0x543220, { roughness:0.7 })); pocket.position.set(0, 0.0, 0.14 * W); torso.add(pocket);
-      for (const a of this.arms){ const glove = sphere(0.03, std(0x3a2618, { roughness:0.8 }), 1, 1.2, 1); glove.position.copy(a.hand.position); glove.position.y += 0.02; a.el.add(glove); }
-      const hammer = new THREE.Group();
-      // il martello pende dalla mano: testa in basso, ben visibile accanto alla gamba
-      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.34, 8), std(0x8a5a32, { roughness:0.6 })); handle.position.y = -0.12; hammer.add(handle);
-      const headM = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.065, 0.065), std(0x60656e, { metalness:0.9, roughness:0.35 })); headM.position.y = -0.29; hammer.add(headM);
-      hammer.position.copy(this.weaponArm.hand.position); hammer.position.y -= 0.03; hammer.position.z = 0.02;
-      this.weaponArm.el.add(hammer);
-      this.staff = hammer;
+      // fabbro templare: cotta di maglia, sopravveste bianca con croce rossa, spalline e guanti d'acciaio, ascia da lui forgiata
+      const steel = std(0x9aa1ab, { metalness:0.85, roughness:0.4 });
+      const tab = new THREE.Mesh(new THREE.CylinderGeometry(0.108 * W, 0.16 * W, tH * 0.9 + legLen * 0.62, 28, 1, true, -Math.PI * 0.46, Math.PI * 0.92), cloth(0xf1eee6, { side:THREE.DoubleSide }));
+      tab.position.y = hipY - legLen * 0.31 + tH * 0.45 - 0.03; body.add(tab);
+      const red = std(0xb32424, { roughness:0.6 });
+      const cv = new THREE.Mesh(new THREE.BoxGeometry(0.036, tH * 0.8, 0.008), red); cv.position.set(0, tH * 0.42, 0.128 * W); torso.add(cv);
+      const ch = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.036, 0.008), red); ch.position.set(0, tH * 0.6, 0.128 * W); torso.add(ch);
+      const coif = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.07, 0.07, 18, 1, true), std(0x7d848e, { metalness:0.7, roughness:0.55, side:THREE.DoubleSide })); coif.position.y = tH + 0.02; torso.add(coif);
+      for (const a of this.arms){
+        const paul = new THREE.Mesh(new THREE.SphereGeometry(0.058, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), steel); paul.scale.set(1, 0.8, 1.1); paul.position.y = 0.03; a.sh.add(paul);
+        const glove = sphere(0.03, steel, 1, 1.2, 1); glove.position.copy(a.hand.position); glove.position.y += 0.02; a.el.add(glove);
+      }
+      belt.material = std(0x3a2618, { roughness:0.5 });
+      const axe = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.5, 8), std(0x8a5a32, { roughness:0.6 })); shaft.position.y = -0.17; axe.add(shaft);
+      const bladeG = new THREE.CylinderGeometry(0.14, 0.14, 0.016, 20, 1, false, -Math.PI * 0.32, Math.PI * 0.64);
+      const blade = new THREE.Mesh(bladeG, steel); blade.rotation.set(Math.PI / 2, 0, Math.PI / 2); blade.position.set(0, -0.38, 0.1); axe.add(blade);
+      const cheek = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.05), steel); cheek.position.set(0, -0.38, 0.02); axe.add(cheek);
+      axe.position.copy(this.weaponArm.hand.position); axe.position.y -= 0.03; axe.position.z = 0.02;
+      this.weaponArm.el.add(axe);
+      this.staff = axe;
     } else if (outfit === 'bard'){
       // bardo: farsetto con mantellina, berretto con la piuma, liuto a tracolla sulla schiena
       const cape = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * W, 0.17 * W, tH * 0.55, 24, 1, true, Math.PI * 0.6, Math.PI * 0.8), cloth(new THREE.Color(color).multiplyScalar(0.55), { side:THREE.DoubleSide }));

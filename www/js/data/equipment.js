@@ -24,9 +24,9 @@ export const EQUIP = {
   // ---- Fabri (strumenti del bardo; le chiavi restano quelle dei salvataggi) ----
   revolver:          W('Liuto da Viaggio', 'fabri', { mag:5, spd:1 }, 130, 'Sei corde e un po’ di fortuna.'),
   pistole_gemelle:   W('Mandolino d’Ebano', 'fabri', { mag:12, spd:3 }, 720, 'Suona da solo le note che Fabri dimentica.'),
-  // ---- Pasq (martelli da fabbro) ----
-  bende_monaco:      W('Martello da Forgia', 'pasq', { atk:5, def:1 }, 130, 'Consumato dall’incudine di Castiglione.'),
-  artigli_tigre:     W('Maglio del Borgo', 'pasq', { atk:13, def:3 }, 740, 'Ha piegato cancellate e armature.'),
+  // ---- Pasq (asce forgiate da lui) ----
+  bende_monaco:      W('Ascia da Forgia', 'pasq', { atk:5, def:1 }, 130, 'La prima ascia che Pasq ha battuto sull’incudine di Castiglione.'),
+  artigli_tigre:     W('Ascia del Templare', 'pasq', { atk:13, def:3 }, 740, 'Temprata tre volte, con la croce incisa sulla lama.'),
   // ---- Sofy (bacchette fatate) ----
   aspersorio:        W('Bacchetta di Lucciola', 'sofy', { mag:5, spr:3 }, 140, 'Si accende da sola quando fa buio.'),
   bastone_aurora:    W('Bacchetta dell’Aurora', 'sofy', { mag:14, spr:8, mp:15 }, 900, 'Brilla come l’alba sul lago.'),

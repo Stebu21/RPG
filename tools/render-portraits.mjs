@@ -12,7 +12,7 @@ const server = http.createServer(async (q, r)=>{
 }).listen(8792);
 const browser = await puppeteer.launch({ executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe', headless:'new' });
 const page = await browser.newPage();
-page.on('pageerror', e=>console.log('errore pagina:', e.message));
+page.on('console', m=>console.log(m.text())); page.on('pageerror', e=>console.log('errore pagina:', e.message));
 await page.goto('http://localhost:8792/p');
 const png = await page.evaluate(async ()=>{
   const { drawPortrait } = await import('/js/engine/sprites.js');
@@ -20,7 +20,7 @@ const png = await page.evaluate(async ()=>{
   const ids = Object.keys(CHARACTERS), out = document.createElement('canvas'); out.width = 140 * ids.length; out.height = 140;
   const g = out.getContext('2d');
   ids.forEach((id, i)=>{ const c = document.createElement('canvas'); drawPortrait(c, CHARACTERS[id]); g.drawImage(c, i * 140, 0); });
-  return out.toDataURL('image/png');
+  { const c = document.createElement('canvas'); drawPortrait(c, CHARACTERS.pasq); const d = c.getContext('2d'); console.log('pasq', JSON.stringify([...d.getImageData(70,80,1,1).data]), JSON.stringify([...d.getImageData(70,90,1,1).data])); const e = document.createElement('canvas'); drawPortrait(e, CHARACTERS.mirko); console.log('mirko', JSON.stringify([...e.getContext('2d').getImageData(70,80,1,1).data])); } return out.toDataURL('image/png');
 });
 await writeFile(new URL('./portraits.png', import.meta.url), Buffer.from(png.split(',')[1], 'base64'));
 await browser.close(); server.close();

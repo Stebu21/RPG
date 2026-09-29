@@ -47,8 +47,8 @@ export const CHARACTERS = {
   },
   pasq: {
     name:'Pasq', className:'Fabbro', color:'#e67e22',
-    look:{ h:'mid', build:'wide', bald:true, hair:'#222222', eyes:'#3b7dd8', outfit:'smith' },
-    desc:'Spalle larghe da incudine, testa rasata a specchio e due occhi azzurri che valutano ogni lama. Fabbro di Castiglione: ha forgiato le cancellate del borgo e le chiavi della Collegiata. Parla poco, batte molto.',
+    look:{ h:'mid', build:'wide', bald:true, hair:'#222222', eyes:'#3b7dd8', beard:2, outfit:'smith' },
+    desc:'Spalle larghe da incudine, testa rasata a specchio, barba incolta e due occhi azzurri che valutano ogni lama. Fabbro di Castiglione e cavaliere templare: veste cotta di maglia e sopravveste con la croce rossa, e combatte con un’ascia che si è forgiato da solo. Parla poco, batte molto.',
     base:{ hp:68, mp:14, atk:15, def:14, mag:4, spr:8, spd:8 },
     growth:{ hp:11.6, mp:2.0, atk:3.0, def:2.7, mag:0.8, spr:1.6, spd:1.3 },
     learnset:[
