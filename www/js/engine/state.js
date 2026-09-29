@@ -36,7 +36,8 @@ export function statsOf(cs){
 
 export function knownAbilities(cs){
   const lv = CHARACTERS[cs.id].learnset.filter(l => l.lv <= cs.level).map(l => l.ab);
-  const extra = (cs.tomes || []).filter(ab => !lv.includes(ab));   // apprese dai tomi
+  // apprese dai tomi (quelle che non esistono più, da salvataggi vecchi, si ignorano)
+  const extra = (cs.tomes || []).filter(ab => !lv.includes(ab) && ABILITIES[ab]);
   return [...lv, ...extra];
 }
 

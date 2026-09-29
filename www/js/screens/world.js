@@ -111,7 +111,7 @@ const PARTNER_LINES = {
   riki: [
     [{ not:['intro_done'] }, 'Il Rettore ci aspetta. Non vorrai arrivare tardi all’unico esame che conta.'],
     [{ not:['sigillo_alba'] }, 'Vedano, la chiesa del Lazzaretto, una statua che cammina. Io taglio, tu fai le lucine. Il solito.'],
-    [{ not:['sigillo_meriggio'] }, 'Castiglione, la Collegiata. Dicono ci sia un ladro dentro. Il sigillo è nostro prima che suo.'],
+    [{ not:['sigillo_meriggio'] }, 'Castiglione, la Collegiata. Dicono ci sia un bardo dentro. Il sigillo è nostro prima che ci scriva sopra una canzone.'],
     [{ not:['sigillo_vespro'] }, 'Un cavaliere di ottocento anni. Finalmente qualcuno che sa tenere una spada.'],
     [{ not:['sigillo_notte'] }, 'Un drago di lamiera a Samarate. E c’è Sofy: prova a non inciampare nei tuoi stessi incantesimi.'],
     [{ not:['game_done'] }, 'Quattro sigilli. Il Sacro Monte ci aspetta. Nessun rimpianto, fratello.'],
@@ -120,9 +120,9 @@ const PARTNER_LINES = {
   ste: [
     [{ not:['intro_done'] }, 'L’aula magna è di qua. Riki, prova a non addormentarti durante il discorso.'],
     [{ not:['sigillo_alba'] }, 'Il Lazzaretto di Vedano, a sud-est. Tu apri la strada, io ti copro con la magia.'],
-    [{ not:['sigillo_meriggio'] }, 'Castiglione Olona. Un ladro nella Collegiata, un’ombra sull’altare: giornata piena.'],
+    [{ not:['sigillo_meriggio'] }, 'Castiglione Olona. Un bardo nella Collegiata, un’ombra sull’altare: giornata piena.'],
     [{ not:['sigillo_vespro'] }, 'Il castello di Jerago. Ho letto che i fantasmi odiano il fuoco. O amano il fuoco. Vedremo.'],
-    [{ not:['sigillo_notte'] }, 'Samarate... sì, Sofy dovrebbe essere lì. No, non sto arrossendo. È il riflesso del drago.'],
+    [{ not:['sigillo_notte'] }, 'Samarate... sì, Sofy dovrebbe essere lì. No, non sto arrossendo. È la polvere di fata.'],
     [{ not:['game_done'] }, 'Abbiamo i quattro sigilli. Qualunque cosa succeda lassù, ci siamo arrivati insieme.'],
     [null, 'Ce l’abbiamo fatta. Adesso però gli esami li correggi tu.'],
   ],

@@ -1193,6 +1193,21 @@ export function drawPortrait(canvas, character){
   x.beginPath(); x.arc(S/2, S*0.45, S*0.42, 0, Math.PI*2); x.fill();
 
   const cx = S/2, headR = look.h === 'short' ? 30 : 33, headCy = 58;
+  const outfit = look.outfit;
+
+  // ali delle fate, dietro a tutto
+  if (outfit === 'fairy'){
+    for (const s of [-1, 1]){
+      for (const [dx, dy, rx, ry, a] of [[44, 78, 34, 20, -0.5], [38, 112, 24, 13, 0.4]]){
+        x.save(); x.translate(cx + s * dx, dy); x.rotate(s * a);
+        x.fillStyle = 'rgba(255,255,255,.45)'; x.strokeStyle = col(character.color, 0.4); x.lineWidth = 2;
+        x.beginPath(); x.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); x.fill(); x.stroke();
+        x.strokeStyle = 'rgba(255,255,255,.7)'; x.lineWidth = 1;
+        x.beginPath(); x.moveTo(-s * rx, 0); x.lineTo(s * rx * 0.7, -ry * 0.3); x.stroke();
+        x.restore();
+      }
+    }
+  }
 
   // spalle / busto
   const shW = look.build === 'wide' ? 108 : 88;
@@ -1200,6 +1215,25 @@ export function drawPortrait(canvas, character){
   rr(x, cx-shW/2, 97, shW, 50, 18); x.fill();
   x.fillStyle = 'rgba(255,255,255,.15)';
   rr(x, cx-shW/2+6, 100, shW-12, 7, 4); x.fill();
+  if (outfit === 'healer'){
+    // veste bianca con croce rossa
+    x.fillStyle = '#f2efe8'; rr(x, cx-shW/2, 97, shW, 50, 18); x.fill();
+    x.fillStyle = col(character.color, -0.1); rr(x, cx-shW/2, 97, shW, 5, 3); x.fill();
+    x.fillStyle = '#c0392b'; x.fillRect(cx-3, 110, 6, 18); x.fillRect(cx-9, 116, 18, 6);
+  } else if (outfit === 'smith'){
+    // camicia scura e grembiule di cuoio con le bretelle
+    x.fillStyle = '#4a4038'; rr(x, cx-shW/2, 97, shW, 50, 18); x.fill();
+    x.fillStyle = '#6b4128'; rr(x, cx-26, 108, 52, 40, 6); x.fill();
+    x.fillStyle = '#543220'; x.fillRect(cx-30, 97, 8, 14); x.fillRect(cx+22, 97, 8, 14); x.fillRect(cx-12, 122, 24, 12);
+  } else if (outfit === 'bard'){
+    // mantellina e tracolla del liuto
+    x.fillStyle = col(character.color, -0.45); rr(x, cx-shW/2, 97, shW, 16, 8); x.fill();
+    x.strokeStyle = '#3a2618'; x.lineWidth = 5; x.beginPath(); x.moveTo(cx-shW/2+10, 100); x.lineTo(cx+shW/2-14, S); x.stroke();
+  } else if (outfit === 'botanist'){
+    // grembiule verde con un rametto nel taschino
+    x.fillStyle = '#3f8a48'; rr(x, cx-28, 106, 56, 42, 6); x.fill();
+    x.fillStyle = '#5fbf4a'; x.beginPath(); x.ellipse(cx+16, 112, 4, 9, 0.4, 0, Math.PI * 2); x.fill(); x.beginPath(); x.ellipse(cx+22, 110, 3, 7, -0.3, 0, Math.PI * 2); x.fill();
+  }
 
   // collo
   x.fillStyle = col(skin, -0.05);
@@ -1246,6 +1280,22 @@ export function drawPortrait(canvas, character){
       x.stroke();
       circ(x, cx+headR-4, headCy-9, 4, col(hair, -0.35));
     }
+  }
+
+  // copricapi: coroncina delle fate, berretto piumato del bardo, cappello di paglia del botanico
+  if (outfit === 'fairy'){
+    for (let i = 0; i < 7; i++){
+      const a = Math.PI * (1.12 + i * 0.13);
+      circ(x, cx + Math.cos(a) * (headR + 1), headCy - 4 + Math.sin(a) * (headR + 1), 5, i % 2 ? '#ffd6ec' : '#fff3a0');
+      circ(x, cx + Math.cos(a) * (headR + 1), headCy - 4 + Math.sin(a) * (headR + 1), 2, i % 2 ? '#e05a9a' : '#e0a020');
+    }
+  } else if (outfit === 'bard'){
+    x.fillStyle = '#7a1f2b'; x.beginPath(); x.ellipse(cx+6, headCy-headR+2, headR+4, 13, -0.15, 0, Math.PI * 2); x.fill();
+    x.fillStyle = '#f5f0e0'; x.beginPath(); x.ellipse(cx+headR, headCy-headR-10, 5, 22, 0.9, 0, Math.PI * 2); x.fill();
+  } else if (outfit === 'botanist'){
+    x.fillStyle = '#e2c27a'; x.beginPath(); x.ellipse(cx, headCy-headR+10, headR+26, 10, 0, 0, Math.PI * 2); x.fill();
+    rr(x, cx-headR+6, headCy-headR-16, (headR-6)*2, 26, 8); x.fill();
+    x.fillStyle = '#2f7a3a'; x.fillRect(cx-headR+6, headCy-headR+2, (headR-6)*2, 6);
   }
 
   // barba

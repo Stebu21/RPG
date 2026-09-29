@@ -204,7 +204,7 @@ export class Person {
     const outfit = look.outfit;
     const inkSkin = look.tattoo ? skinMat(0xffffff, tattooTexture()) : skin;
     // il samurai veste un gi scuro, il mago un soprabito antracite: il colore del personaggio resta nei dettagli
-    const coatCol = outfit === 'mage' ? 0x2a2638 : outfit === 'samurai' ? 0x23262e : null;
+    const coatCol = outfit === 'mage' ? 0x2a2638 : outfit === 'samurai' ? 0x23262e : outfit === 'healer' ? 0xf4f1ea : outfit === 'smith' ? 0x4a4038 : null;
     if (coatCol !== null) shirt.color.set(coatCol);
     const accent = cloth(color, { roughness:0.6 });
 
@@ -243,7 +243,7 @@ export class Person {
     // --- braccia (spalle arrotondate, gomiti, mani con le dita) ---
     const shY = tH * 0.85, shX = 0.122 * (wide ? 1.2 : 1);
     const armLen = H * 0.36, upA = armLen * 0.48, loA = armLen * 0.46;
-    const longSleeve = outfit === 'mage';
+    const longSleeve = outfit === 'mage' || outfit === 'healer' || outfit === 'bard';
     const upperM = outfit === 'samurai' || look.tattoo ? inkSkin : shirt;
     const lowerM = longSleeve ? shirt : look.tattoo ? inkSkin : skin;
     this.arms = [];
@@ -541,13 +541,122 @@ export class Person {
       staff.position.copy(this.weaponArm.hand.position); staff.position.y -= 0.04; staff.position.z = 0.02;
       this.weaponArm.el.add(staff);
       this.staff = staff; this.gem = gem;
+    } else if (outfit === 'fairy'){
+      // fata: gonna a petali, due paia di ali trasparenti che battono, coroncina di fiori, bacchetta con la stella
+      const skirtG = new THREE.CylinderGeometry(0.1 * W, 0.19 * W, legLen * 0.42, 40, 2, true);
+      const sp = skirtG.attributes.position;
+      for (let i=0; i<sp.count; i++){ const x = sp.getX(i), z = sp.getZ(i), y = sp.getY(i), a = Math.atan2(z, x); if (y < 0){ const k = 1 + 0.12 * Math.max(0, Math.cos(a * 8)); sp.setX(i, x * k); sp.setZ(i, z * k); sp.setY(i, y - 0.02 * Math.max(0, Math.cos(a * 8))); } }
+      skirtG.computeVertexNormals();
+      const skirt = new THREE.Mesh(skirtG, cloth(color, { roughness:0.7, side:THREE.DoubleSide }));
+      skirt.scale.z = 0.8; skirt.position.y = hipY - legLen * 0.2; body.add(skirt);
+      const wingM = new THREE.MeshStandardMaterial({ color:new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.55), emissive:color, emissiveIntensity:0.45, transparent:true, opacity:0.72, side:THREE.DoubleSide, roughness:0.2, depthWrite:false });
+      const veinM = new THREE.MeshBasicMaterial({ color:new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.2), transparent:true, opacity:0.8 });
+      this.wings = [];
+      for (const s of [-1, 1]){
+        const pivot = new THREE.Group(); pivot.position.set(s * 0.03, tH * 0.72, -0.07 * W); torso.add(pivot);
+        for (const [len, wid, tilt, y] of [[0.42, 0.24, 0.55, 0.05], [0.3, 0.16, -0.35, -0.1]]){
+          const w = new THREE.Mesh(new THREE.CircleGeometry(1, 24), wingM);
+          w.scale.set(len * 0.5, wid * 0.5, 1); w.position.set(s * len * 0.46, y + Math.sin(tilt) * len * 0.3, 0); w.rotation.z = s * tilt;
+          pivot.add(w);
+          const vein = new THREE.Mesh(new THREE.BoxGeometry(len * 0.85, 0.004, 0.002), veinM);
+          vein.position.copy(w.position); vein.rotation.z = w.rotation.z; pivot.add(vein);
+        }
+        pivot.rotation.y = s * 0.3;
+        this.wings.push({ pivot, s });
+      }
+      const crown = new THREE.Group();
+      for (let i=0; i<9; i++){
+        const a = (i / 9) * Math.PI * 2;
+        const f = sphere(0.016, std(i % 3 ? 0xffd6ec : 0xfff3a0, { emissive:i % 3 ? 0x552244 : 0x554400, emissiveIntensity:0.4 }), 1, 0.7, 1);
+        f.position.set(Math.cos(a) * hr * 0.92, 0, Math.sin(a) * hr * 0.92); crown.add(f);
+      }
+      crown.position.y = hr * 0.55; crown.rotation.x = -0.18; head.add(crown);
+      const wand = new THREE.Group();
+      wand.add(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.008, 0.3, 8), std(0xf3e6c8, { roughness:0.4 })));
+      const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.035, 0), new THREE.MeshStandardMaterial({ color:0xfff4b0, emissive:color, emissiveIntensity:1.4, roughness:0.2 }));
+      star.scale.set(1, 1, 0.4); star.position.y = 0.17; wand.add(star);
+      wand.position.copy(this.weaponArm.hand.position); wand.position.y -= 0.03; wand.position.z = 0.02;
+      this.weaponArm.el.add(wand);
+      this.staff = wand; this.gem = star;
+    } else if (outfit === 'smith'){
+      // fabbro: grembiule di cuoio con tasche, guanti spessi, martello in mano
+      const leather = std(0x6b4128, { roughness:0.6 });
+      const apron = new THREE.Mesh(new THREE.CylinderGeometry(0.105 * W, 0.15 * W, tH * 0.9 + legLen * 0.55, 24, 1, true, -Math.PI * 0.42, Math.PI * 0.84), std(0x6b4128, { roughness:0.6, side:THREE.DoubleSide }));
+      apron.scale.z = 0.95; apron.position.y = hipY - legLen * 0.27 + tH * 0.45 - 0.03; body.add(apron);
+      for (const sx of [-1, 1]){ const strap = new THREE.Mesh(new THREE.BoxGeometry(0.014, tH * 0.5, 0.006), leather); strap.position.set(sx * 0.045, tH * 0.78, 0.08 * W); strap.rotation.z = sx * 0.12; torso.add(strap); }
+      const pocket = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.01), std(0x543220, { roughness:0.7 })); pocket.position.set(0, 0.0, 0.14 * W); torso.add(pocket);
+      for (const a of this.arms){ const glove = sphere(0.03, std(0x3a2618, { roughness:0.8 }), 1, 1.2, 1); glove.position.copy(a.hand.position); glove.position.y += 0.02; a.el.add(glove); }
+      const hammer = new THREE.Group();
+      // il martello pende dalla mano: testa in basso, ben visibile accanto alla gamba
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.34, 8), std(0x8a5a32, { roughness:0.6 })); handle.position.y = -0.12; hammer.add(handle);
+      const headM = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.065, 0.065), std(0x60656e, { metalness:0.9, roughness:0.35 })); headM.position.y = -0.29; hammer.add(headM);
+      hammer.position.copy(this.weaponArm.hand.position); hammer.position.y -= 0.03; hammer.position.z = 0.02;
+      this.weaponArm.el.add(hammer);
+      this.staff = hammer;
+    } else if (outfit === 'bard'){
+      // bardo: farsetto con mantellina, berretto con la piuma, liuto a tracolla sulla schiena
+      const cape = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * W, 0.17 * W, tH * 0.55, 24, 1, true, Math.PI * 0.6, Math.PI * 0.8), cloth(new THREE.Color(color).multiplyScalar(0.55), { side:THREE.DoubleSide }));
+      cape.position.y = tH * 0.72; torso.add(cape);
+      const beret = new THREE.Group();
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 24), cloth(0x7a1f2b)); cap.scale.set(1, 1, 0.9); beret.add(cap);
+      const feather = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.2, 8), std(0xf5f0e0, { roughness:0.5 }));
+      feather.position.set(0.06, 0.07, -0.02); feather.rotation.z = -0.9; beret.add(feather);
+      beret.position.set(0.012, hr * 0.92, -0.01); beret.rotation.z = -0.22; head.add(beret);
+      const lute = new THREE.Group();
+      const wood = std(0xb07038, { roughness:0.45 });
+      const bowl = sphere(0.1, wood, 0.9, 1.2, 0.45); lute.add(bowl);
+      const hole = new THREE.Mesh(new THREE.CircleGeometry(0.022, 16), std(0x2a1a10)); hole.position.set(0, 0.02, 0.046); lute.add(hole);
+      const neckL = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.26, 0.02), std(0x5a3418)); neckL.position.y = 0.23; lute.add(neckL);
+      const pegbox = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.06, 0.02), std(0x5a3418)); pegbox.position.set(0, 0.38, -0.02); pegbox.rotation.x = -0.6; lute.add(pegbox);
+      lute.position.set(0.02, tH * 0.55, -0.12 * W); lute.rotation.set(0, Math.PI, -0.6); torso.add(lute);
+      const strap = new THREE.Mesh(new THREE.TorusGeometry(0.13 * W, 0.006, 4, 24), std(0x3a2618)); strap.position.y = tH * 0.6; strap.rotation.set(Math.PI / 2, 0.6, 0); strap.scale.set(1, 0.7, 1); torso.add(strap);
+    } else if (outfit === 'healer'){
+      // curatrice: veste bianca lunga con bordo verde, fascia in vita, borsa delle bende, bastone di frassino
+      const robeG = new THREE.CylinderGeometry(0.11 * W, 0.19 * W, legLen * 0.86, 40, 3, true);
+      const rp = robeG.attributes.position;
+      for (let i=0; i<rp.count; i++){ const x = rp.getX(i), z = rp.getZ(i), y = rp.getY(i), a = Math.atan2(z, x), low = 0.5 - y / (legLen * 0.86); const k = 1 + 0.035 * low * Math.sin(a * 7); rp.setX(i, x * k); rp.setZ(i, z * k); }
+      robeG.computeVertexNormals();
+      const robe = new THREE.Mesh(robeG, cloth(0xf4f1ea, { roughness:0.85, side:THREE.DoubleSide }));
+      robe.scale.z = 0.8; robe.position.y = hipY - legLen * 0.4; body.add(robe);
+      const hem = new THREE.Mesh(new THREE.TorusGeometry(0.19 * W, 0.009, 4, 40), accent); hem.rotation.x = Math.PI / 2; hem.scale.set(1, 0.8, 1); hem.position.y = hipY - legLen * 0.83; body.add(hem);
+      belt.material = accent;
+      const emblem = new THREE.Group();
+      const red = std(0xc0392b, { roughness:0.5 });
+      const v = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.05, 0.004), red), h2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.016, 0.004), red);
+      emblem.add(v, h2); emblem.position.set(0, tH * 0.7, 0.088 * W); torso.add(emblem);
+      const bag = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.04), std(0xa87a4a, { roughness:0.7 })); bag.position.set(-0.13 * W, 0.0, 0.03); torso.add(bag);
+      const bagStrap = new THREE.Mesh(new THREE.TorusGeometry(0.14 * W, 0.005, 4, 24), std(0x6b4128)); bagStrap.position.y = tH * 0.45; bagStrap.rotation.set(Math.PI / 2, -0.7, 0); bagStrap.scale.set(1, 0.7, 1); torso.add(bagStrap);
+      const staff = new THREE.Group();
+      staff.add(new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.013, 1.0, 8), std(0xc9a06a, { roughness:0.6 })));
+      const top = sphere(0.035, new THREE.MeshStandardMaterial({ color:0xc8ffd8, emissive:0x2ecc71, emissiveIntensity:1.1, roughness:0.2 })); top.position.y = 0.53; staff.add(top);
+      for (const s of [-1, 1]){ const leaf = sphere(0.02, std(0x3c9a4a), 1.6, 0.4, 1); leaf.position.set(s * 0.03, 0.49, 0); leaf.rotation.z = s * 0.6; staff.add(leaf); }
+      staff.position.copy(this.weaponArm.hand.position); staff.position.y -= 0.04; staff.position.z = 0.02;
+      this.weaponArm.el.add(staff);
+      this.staff = staff; this.gem = top;
+    } else if (outfit === 'botanist'){
+      // botanico: cappello di paglia a tesa larga, grembiule verde, borsa con germogli, falcetto alla cintura
+      const straw = std(0xe2c27a, { roughness:0.85 });
+      const hat = new THREE.Group();
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.008, 36), straw);
+      const crownH = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.07, 28), straw); crownH.position.y = 0.038;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.091, 0.091, 0.016, 28, 1, true), cloth(0x2f7a3a)); band.position.y = 0.012;
+      hat.add(brim, crownH, band); hat.position.set(0, hr * 0.9, -0.02); hat.rotation.x = -0.1; head.add(hat);
+      const apron = new THREE.Mesh(new THREE.CylinderGeometry(0.108 * W, 0.15 * W, tH * 0.55 + legLen * 0.45, 24, 1, true, -Math.PI * 0.4, Math.PI * 0.8), cloth(0x3f8a48, { side:THREE.DoubleSide }));
+      apron.position.y = hipY - legLen * 0.22 + tH * 0.2; body.add(apron);
+      const bag = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, 0.05), std(0x8a6038, { roughness:0.7 })); bag.position.set(-0.13 * W, 0.0, 0.02); torso.add(bag);
+      for (let i=0; i<3; i++){ const sprout = sphere(0.018, std(0x5fbf4a), 0.6, 1.6, 0.6); sprout.position.set(-0.13 * W + (i - 1) * 0.022, 0.06, 0.02); sprout.rotation.z = (i - 1) * 0.4; torso.add(sprout); }
+      const sickle = new THREE.Group();
+      sickle.add(new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.1, 8), std(0x8a5a32)));
+      const blade = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.006, 4, 16, Math.PI * 1.1), std(0xd0d6de, { metalness:0.9, roughness:0.3 })); blade.position.set(0.04, 0.07, 0); sickle.add(blade);
+      sickle.position.copy(this.weaponArm.hand.position); sickle.position.y -= 0.03; sickle.position.z = 0.02;
+      this.weaponArm.el.add(sickle);
     } else {
       // NPC: colletto della maglia
       const col = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.008, 6, 18), shirt); col.rotation.x = Math.PI / 2; col.scale.set(1, 0.8, 1); col.position.y = tH + 0.0; torso.add(col);
     }
 
     // meno pezzi da disegnare: ogni parte rigida diventa poche mesh (una per materiale)
-    const keep = new Set([...this.lids, this.ponytail, this.gem, this.sheath].filter(Boolean));
+    const keep = new Set([...this.lids, this.ponytail, this.gem, this.sheath, ...(this.wings || []).map(w=>w.pivot)].filter(Boolean));
     mergeRigid(this.head, keep);
     for (const l of this.legs){ mergeRigid(l.knee, keep); mergeRigid(l.hip, new Set([l.knee])); }
     for (const a of this.arms){
@@ -604,8 +713,10 @@ export class Person {
     if (this.ponytail) this.ponytail.rotation.set(-0.35 - amt * 0.4, 0, Math.sin(ph) * 0.3 * amt);
     if (this.staff){
       this.staff.rotation.x = -(this.weaponArm.sh.rotation.x + this.weaponArm.el.rotation.x);
-      this.gem.rotation.y += dt * 2;
+      if (this.gem) this.gem.rotation.y += dt * 2;
     }
+    // ali delle fate: battito rapido, più ampio quando si cammina
+    if (this.wings) for (const w of this.wings) w.pivot.rotation.y = w.s * (0.3 + Math.sin(this.t * 14) * (0.22 + amt * 0.18));
     // battito di ciglia
     this.blink -= dt;
     const closed = this.blink < 0.12;

@@ -8,8 +8,8 @@ export const SLOTS_EQ = ['arma', 'abito', 'accessorio'];
 export const SLOT_NAMES = { arma:'Arma', abito:'Abito', accessorio:'Accessorio' };
 
 const W = (name, who, stats, price, desc)=>({ name, slot:'arma', who:[who], stats, price, desc });
-const MAGI = ['ste', 'sofy', 'vero'];
-const AGILI = ['riki', 'fabri', 'elly', 'pasq'];
+const MAGI = ['ste', 'sofy', 'vero', 'elly', 'fabri'];
+const AGILI = ['riki', 'fabri'];
 const PESANTI = ['riki', 'mirko', 'pasq'];
 
 export const EQUIP = {
@@ -21,24 +21,24 @@ export const EQUIP = {
   katana_acciaio:    W('Katana d’Acciaio', 'riki', { atk:5 }, 130, 'Forgiata in una bottega di Varese.'),
   katana_biumo:      W('Kiku-ichimonji', 'riki', { atk:12, spd:2 }, 720, 'Lama leggera dal filo ondulato.'),
   masamune:          W('Masamune dell’Olona', 'riki', { atk:24, spd:4, crit:0.08 }, 2400, 'Temprata nelle acque del fiume.'),
-  // ---- Fabri (pistole) ----
-  revolver:          W('Revolver a Tamburo', 'fabri', { atk:5, spd:1 }, 130, 'Sei colpi e un po’ di fortuna.'),
-  pistole_gemelle:   W('Pistole Gemelle', 'fabri', { atk:12, spd:3 }, 720, 'Una per mano, per non far torto a nessuno.'),
-  // ---- Pasq (tirapugni) ----
-  bende_monaco:      W('Bende Consacrate', 'pasq', { atk:5, def:1 }, 130, 'Avvolte con preghiere antiche.'),
-  artigli_tigre:     W('Artigli della Tigre', 'pasq', { atk:13, spd:2 }, 740, 'I pugni graffiano come felini.'),
-  // ---- Sofy (scettri sacri) ----
-  aspersorio:        W('Aspersorio d’Argento', 'sofy', { mag:5, spr:3 }, 140, 'Sparge acqua benedetta... e luce.'),
-  bastone_aurora:    W('Bastone dell’Aurora', 'sofy', { mag:14, spr:8, mp:15 }, 900, 'Brilla come l’alba sul lago.'),
-  // ---- Elly (archi) ----
-  arco_frassino:     W('Arco di Frassino', 'elly', { atk:6, spd:1 }, 140, 'Leggero e silenzioso.'),
-  arco_quercia:      W('Arco della Quercia Antica', 'elly', { atk:14, mag:4 }, 900, 'Gli alberi le prestano la mira.'),
-  // ---- Mirko (asce) ----
-  ascia_cavatore:    W('Ascia del Cavatore', 'mirko', { atk:8 }, 160, 'Ha spaccato più sassi che nemici. Per ora.'),
-  ascia_titano:      W('Ascia del Titano', 'mirko', { atk:18, hp:40 }, 950, 'Serve un gigante per sollevarla. O Mirko.'),
-  // ---- Vero (flauti) ----
-  flauto_osso:       W('Flauto d’Avorio', 'vero', { mag:5, mp:8 }, 140, 'Le sue note chiamano gli spiriti.'),
-  arpa_lago:         W('Arpa del Lago', 'vero', { mag:14, spr:6, mp:20 }, 950, 'Suona anche quando nessuno la tocca.'),
+  // ---- Fabri (strumenti del bardo; le chiavi restano quelle dei salvataggi) ----
+  revolver:          W('Liuto da Viaggio', 'fabri', { mag:5, spd:1 }, 130, 'Sei corde e un po’ di fortuna.'),
+  pistole_gemelle:   W('Mandolino d’Ebano', 'fabri', { mag:12, spd:3 }, 720, 'Suona da solo le note che Fabri dimentica.'),
+  // ---- Pasq (martelli da fabbro) ----
+  bende_monaco:      W('Martello da Forgia', 'pasq', { atk:5, def:1 }, 130, 'Consumato dall’incudine di Castiglione.'),
+  artigli_tigre:     W('Maglio del Borgo', 'pasq', { atk:13, def:3 }, 740, 'Ha piegato cancellate e armature.'),
+  // ---- Sofy (bacchette fatate) ----
+  aspersorio:        W('Bacchetta di Lucciola', 'sofy', { mag:5, spr:3 }, 140, 'Si accende da sola quando fa buio.'),
+  bastone_aurora:    W('Bacchetta dell’Aurora', 'sofy', { mag:14, spr:8, mp:15 }, 900, 'Brilla come l’alba sul lago.'),
+  // ---- Elly (bastoni da curatrice) ----
+  arco_frassino:     W('Bastone di Frassino', 'elly', { mag:4, spr:3 }, 140, 'Per camminare, per curare, per bussare in testa a Fabri.'),
+  arco_quercia:      W('Caduceo della Guaritrice', 'elly', { mag:10, spr:9, mp:12 }, 900, 'Due serpi d’argento attorno al legno di quercia.'),
+  // ---- Mirko (attrezzi del botanico) ----
+  ascia_cavatore:    W('Falcetto dell’Erborista', 'mirko', { atk:4, mag:4 }, 160, 'Taglia erbe, rovi e ogni tanto un nemico.'),
+  ascia_titano:      W('Vanga del Giardino Antico', 'mirko', { atk:8, mag:10, hp:40 }, 950, 'Dove affonda, qualcosa germoglia.'),
+  // ---- Vero (bacchette fatate) ----
+  flauto_osso:       W('Bacchetta di Rugiada', 'vero', { mag:5, mp:8 }, 140, 'Lascia una scia di gocce che brillano.'),
+  arpa_lago:         W('Bacchetta del Lago', 'vero', { mag:14, spr:6, mp:20 }, 950, 'Un giunco del Lago di Varese che sogna da solo.'),
 
   // ---- abiti ----
   tunica_allievo:    { name:'Soprabito da Allievo', slot:'abito', who:MAGI, stats:{ def:2, spr:4, mp:8 }, price:150, desc:'Il cappotto dell’Accademia, con tasche per le pergamene.' },
@@ -67,13 +67,13 @@ export const TOMES = {
   rotolo_iaijutsu: { name:'Rotolo: Iaijutsu', who:'riki', ab:'iaijutsu', price:300 },
   rotolo_vento:    { name:'Rotolo: Lama del Vento', who:'riki', ab:'lama_del_vento', price:700 },
   rotolo_lune:     { name:'Rotolo: Danza delle Quattro Lune', who:'riki', ab:'danza_lune', price:1500 },
-  tomo_benedizione:{ name:'Tomo: Benedizione', who:'sofy', ab:'benedizione', price:600 },
-  tomo_curara:     { name:'Tomo: Curara', who:'sofy', ab:'curara', price:1100 },
-  spartito_ninna:  { name:'Spartito: Ninnananna', who:'vero', ab:'ninnananna', price:700 },
-  manuale_raffica: { name:'Manuale: Raffica', who:'fabri', ab:'raffica', price:1200 },
-  manuale_spine:   { name:'Erbario: Spine', who:'elly', ab:'spine', price:500 },
-  manuale_urlo:    { name:'Manuale: Urlo di Guerra', who:'mirko', ab:'urlo_guerra', price:700 },
-  manuale_calcio:  { name:'Manuale: Calcio Rotante', who:'pasq', ab:'calcio_rotante', price:500 },
+  tomo_benedizione:{ name:'Tomo: Benedizione', who:'elly', ab:'benedizione', price:600 },
+  tomo_curara:     { name:'Tomo: Curara', who:'elly', ab:'curara', price:1100 },
+  spartito_ninna:  { name:'Incanto: Sonno Fatato', who:'vero', ab:'sonno_fatato', price:700 },
+  manuale_raffica: { name:'Spartito: Ninna Nanna', who:'fabri', ab:'ninna_nanna', price:700 },
+  manuale_spine:   { name:'Erbario: Spore Velenose', who:'mirko', ab:'spore_velenose', price:500 },
+  manuale_urlo:    { name:'Erbario: Radici Serpeggianti', who:'mirko', ab:'radici', price:900 },
+  manuale_calcio:  { name:'Manuale: Pioggia di Scintille', who:'pasq', ab:'scintille', price:500 },
 };
 
 export function canEquip(id, charId){
